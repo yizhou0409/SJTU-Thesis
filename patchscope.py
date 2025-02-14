@@ -96,8 +96,8 @@ def patch_target_model(
 
 if __name__=="__main__":
      # Load model and tokenizer
-    source_model, source_tokenizer, source_n_layers = load_model_and_tokenizer("Qwen/Qwen2.5-Math-1.5B-Instruct")
-    target_model, target_tokenizer, target_n_layers = load_model_and_tokenizer("Qwen/Qwen2.5-Math-1.5B-Instruct")
+    source_model, source_tokenizer= load_model_and_tokenizer("Qwen/Qwen2.5-Math-1.5B-Instruct")
+    target_model, target_tokenizer= load_model_and_tokenizer("Qwen/Qwen2.5-Math-1.5B-Instruct")
     # Ensure CUDA is available
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     source_prompt = "What is the result of 1*1+1?"
