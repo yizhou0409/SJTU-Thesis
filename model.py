@@ -2,19 +2,19 @@ import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 def load_model_and_tokenizer(
-        model_name_or_path, 
-        tokenizer_name_or_path=None, 
+        model_name, 
+        tokenizer_name=None, 
         device_map="auto", 
-        cache_dir="$SCRATCH/.cache"
+        cache_dir="/scratch/yl9038/.cache",
         load_in_half=True,
         padding_side="left",
         use_safetensors=True,
     ):
 
-    if not tokenizer_name_or_path:
-        tokenizer_name_or_path = model_name_or_path
-    tokenizer = AutoTokenizer.from_pretrained(tokenizer_name_or_path, use_fast=use_fast_tokenizer, padding_side=padding_side, trust_remote_code=True)
-    # tokenizer = AutoTokenizer.from_pretrained(tokenizer_name_or_path, legacy=False, use_fast=use_fast_tokenizer, padding_side=padding_side, trust_remote_code=True)
+    if not tokenizer_name:
+        tokenizer_name = model_name
+    tokenizer = AutoTokenizer.from_pretrained(tokenizer_name,padding_side=padding_side, trust_remote_code=True)
+    # tokenizer = AutoTokenizer.from_pretrained(tokenizer_name, legacy=False, use_fast=use_fast_tokenizer, padding_side=padding_side, trust_remote_code=True)
 
     # set pad token to eos token if pad token is not set
     if tokenizer.pad_token is None:
@@ -31,7 +31,7 @@ def load_model_and_tokenizer(
     # if tokenizer.pad_token is None:
     #     tokenizer.pad_token = tokenizer.unk_token
     #     tokenizer.pad_token_id = tokenizer.unk_token_id
-    model = AutoModelForCausalLM.from_pretrained(model_name_or_path,
+    model = AutoModelForCausalLM.from_pretrained(model_name,
                                                     torch_dtype=torch.float16,
                                                     device_map=device_map,
                                                     trust_remote_code=True,
@@ -43,3 +43,8 @@ def load_model_and_tokenizer(
         model = model.half()
     model.eval()
     return model, tokenizer
+
+def get_layers_to_enumerate(model):
+    layers = model.model.layers
+    n_layers = len(layers)
+    return layers, n_layers
