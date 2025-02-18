@@ -158,7 +158,7 @@ def main(source_model, target_model, source_tokenizer, target_tokenizer, data_na
             continue
         gt_cot, gt_ans = parse_ground_truth(example, data_name)
         example["gt_ans"] = gt_ans
-        #TODO
+        #TODO, and also needs to generate target prompt
         full_prompt = construct_prompt(example, data_name, args)
 
         if idx == args.start:
