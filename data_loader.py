@@ -20,31 +20,6 @@ def load_data(data_name, split, data_dir="./data"):
         dataset = dataset.filter(
             lambda x: ";" not in x["answer"]
         )  # remove multi-answer examples
-    elif data_name == "mmlu_stem":
-        dataset = load_dataset("hails/mmlu_no_train", "all", split="test")
-        # only keep stem subjects
-        stem_subjects = [
-            "abstract_algebra",
-            "astronomy",
-            "college_biology",
-            "college_chemistry",
-            "college_computer_science",
-            "college_mathematics",
-            "college_physics",
-            "computer_security",
-            "conceptual_physics",
-            "electrical_engineering",
-            "elementary_mathematics",
-            "high_school_biology",
-            "high_school_chemistry",
-            "high_school_computer_science",
-            "high_school_mathematics",
-            "high_school_physics",
-            "high_school_statistics",
-            "machine_learning",
-        ]
-        dataset = dataset.rename_column("subject", "type")
-        dataset = dataset.filter(lambda x: x["type"] in stem_subjects)
     elif data_name == "carp_en":
         dataset = load_jsonl(f"{data_dir}/carp_en/test.jsonl")
     else:
