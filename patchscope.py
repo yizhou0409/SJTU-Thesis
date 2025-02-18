@@ -64,11 +64,12 @@ def patch_target_model(
                             target_token_position: int,
                             source_token_position: int):
         def patching_hook(module, input, output):
+            print(output[0][:, target_token_position, :], hidden_representation[:, source_token_position, source_layer_id, :])
             output[0][:, target_token_position, :] = hidden_representation[:, source_token_position, source_layer_id, :]
             return output
         return patching_hook
-        
-    hook_handle = get_layers_to_enumerate(target_model)[0][target_layer_id].register_forward_hook(
+    layers, n_layers = get_layers_to_enumerate(target_model)
+    hook_handle = layers[target_layer_id].register_forward_hook(
         patching_handler(source_layer_id=source_layer_id, 
                             target_token_position=target_token_position,
                             source_token_position=source_token_position)
@@ -95,5 +96,5 @@ if __name__=="__main__":
     target_prompt = "What is the result of 1*1+1?"
     print("Response: ", generate_response(source_model, source_tokenizer, source_prompt))
     hidden_representation = get_hidden_representation(source_model, source_tokenizer, source_prompt, device)
-    response = patch_target_model(target_model, target_tokenizer, target_prompt, 15, 16, 0, 0, f(hidden_representation), device)
+    response = patch_target_model(target_model=target_model, target_tokenizer=target_tokenizer, target_prompt=target_prompt, source_layer_id=0, target_layer_id=0, source_token_position=0, target_token_position=0, hidden_representation=f(hidden_representation), device=device)
     print("Modified Response: ", response)
