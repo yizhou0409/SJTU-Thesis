@@ -37,7 +37,6 @@ def parse_args():
     parser.add_argument("--start", default=0, type=int)
     parser.add_argument("--end", default=-1, type=int)
     parser.add_argument("--temperature", default=0, type=float)
-    parser.add_argument("--n_sampling", default=1, type=int)
     parser.add_argument("--top_p", default=1, type=float)
     parser.add_argument("--max_tokens_per_call", default=2048, type=int)
     parser.add_argument("--use_safetensors", action="store_false")
@@ -152,14 +151,13 @@ def main(source_model, target_model, source_tokenizer, target_tokenizer, data_na
     for example in tqdm(examples, total=len(examples)):
         idx = example["idx"]
 
-        # parse question and answer TODO
         example["question"] = parse_question(example, data_name)
         if example["question"] == "":
             continue
-        gt_cot, gt_ans = parse_ground_truth(example, data_name)
+        gt_ans = parse_ground_truth(example, data_name)
         example["gt_ans"] = gt_ans
-        #TODO, and also needs to generate target prompt
-        full_prompt = construct_prompt(example, data_name, args)
+        source_full_prompt = construct_prompt(example, data_name, args)
+        target_full_prompt = generate_target_prompt(target_tokenizer)
 
         if idx == args.start:
             print(full_prompt)
@@ -167,23 +165,15 @@ def main(source_model, target_model, source_tokenizer, target_tokenizer, data_na
         sample = {
             "idx": idx,
             "question": example["question"],
-            "gt_cot": gt_cot,
             "gt": gt_ans,
-            "prompt": full_prompt,
+            "source_prompt": source_full_prompt,
+            "target_prompt": target_full_prompt
         }
 
         samples.append(sample)
 
-    # repeat n times
-    input_prompts = [
-        sample["prompt"] for sample in samples for _ in range(args.n_sampling)
-    ]
-
     remain_prompts = [(i, prompt) for i, prompt in enumerate(input_prompts)]
     end_prompts = []
-
-    #TODO What is this
-    max_func_call = 1 if args.prompt_type in ["cot", "pal"] else 4
 
     stop_words = ["</s>", "<|im_end|>", "<|endoftext|>"]
 
@@ -193,57 +183,55 @@ def main(source_model, target_model, source_tokenizer, target_tokenizer, data_na
     # start inference
     # measure time use
     start_time = time.time()
-    for epoch in range(max_func_call):
-        print("-" * 20, "Epoch", epoch)
-        current_prompts = remain_prompts
-        if len(current_prompts) == 0:
-            break
+    current_prompts = remain_prompts
+    if len(current_prompts) == 0:
+        break
 
-        outputs = generate_completions(
-            model=llm,
-            tokenizer=tokenizer,
-            prompts=prompts,
-            max_new_tokens=args.max_tokens_per_call,
-            batch_size=16,
-            stop_id_sequences=stop_words,
-        )
+    outputs = generate_completions(
+        model=llm,
+        tokenizer=tokenizer,
+        prompts=prompts,
+        max_new_tokens=args.max_tokens_per_call,
+        batch_size=16,
+        stop_id_sequences=stop_words,
+    )
 
-        assert len(outputs) == len(current_prompts)
+    assert len(outputs) == len(current_prompts)
 
-        # process all outputs
-        remain_prompts = []
-        remain_codes = []
-        for (i, query), output in zip(current_prompts, outputs):
-            output = output.rstrip()
-            query += output
-            if args.prompt_type == "pal":
-                remain_prompts.append((i, query))
-                if "```python" in output:
-                    output = extract_program(query)
-                remain_codes.append(output)
-            elif args.prompt_type == "cot":
-                end_prompts.append((i, query))
-            elif "boxed" not in output and output.endswith("```"):
-                program = extract_program(query)
-                remain_prompts.append((i, query))
-                remain_codes.append(program)
-            else:
-                end_prompts.append((i, query))
+    # process all outputs
+    remain_prompts = []
+    remain_codes = []
+    for (i, query), output in zip(current_prompts, outputs):
+        output = output.rstrip()
+        query += output
+        if args.prompt_type == "pal":
+            remain_prompts.append((i, query))
+            if "```python" in output:
+                output = extract_program(query)
+            remain_codes.append(output)
+        elif args.prompt_type == "cot":
+            end_prompts.append((i, query))
+        elif "boxed" not in output and output.endswith("```"):
+            program = extract_program(query)
+            remain_prompts.append((i, query))
+            remain_codes.append(program)
+        else:
+            end_prompts.append((i, query))
 
-        # execute the remain prompts
-        remain_results = executor.batch_apply(remain_codes)
-        for k in range(len(remain_prompts)):
-            i, query = remain_prompts[k]
-            res, report = remain_results[k]
-            exec_result = res if res else report
-            if "pal" in args.prompt_type:
-                exec_result = "\\boxed{" + exec_result + "}"
-            exec_result = f"\n```output\n{exec_result}\n```\n"
-            query += exec_result
-            # not end
-            if epoch == max_func_call - 1:
-                query += "\nReach max function call limit."
-            remain_prompts[k] = (i, query)
+    # execute the remain prompts
+    remain_results = executor.batch_apply(remain_codes)
+    for k in range(len(remain_prompts)):
+        i, query = remain_prompts[k]
+        res, report = remain_results[k]
+        exec_result = res if res else report
+        if "pal" in args.prompt_type:
+            exec_result = "\\boxed{" + exec_result + "}"
+        exec_result = f"\n```output\n{exec_result}\n```\n"
+        query += exec_result
+        # not end
+        if epoch == max_func_call - 1:
+            query += "\nReach max function call limit."
+        remain_prompts[k] = (i, query)
 
     # unsolved samples
     print("Unsolved samples:", len(remain_prompts))

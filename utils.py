@@ -1,5 +1,6 @@
 import torch 
 from transformers import AutoModelForCausalLM, AutoTokenizer
+import random
 
 def lower_keys(example):
     new_example = {}
@@ -93,7 +94,7 @@ def load_prompt(data_name, prompt_type, num_shots=0):
 
 PROMPT_TEMPLATES = {
     "very_direct": (
-        "{input}\nPlease reason in your mind and directly put your final answer within \\boxed{{}}.",
+        "{input}\nPlease reason in your mind and directly your put final answer in the next token.",
         "{output}",
         "\n\n",
     ),
@@ -169,6 +170,16 @@ def construct_prompt(example, data_name, args):
 
     return full_prompt.strip(" ")  # important!
 
-def generate_target_prompt():
-    #TODO
-    return
+def generate_target_prompt(tokenizer, k=None):
+    """Generates a token identity prompt with k random tokens."""
+    if k is None:
+        k = random.randint(1, 10)  # Randomly select k in [1, 10]
+
+    # Get the tokenizer's vocabulary and randomly select k tokens
+    vocab = list(tokenizer.get_vocab().keys())
+    random_tokens = random.sample(vocab, k)
+
+    # Format them into the token identity structure
+    token_identity_prompt = " ; ".join([f"{tok}->{tok}" for tok in random_tokens])
+
+    return token_identity_prompt
