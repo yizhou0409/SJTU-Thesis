@@ -180,6 +180,6 @@ def generate_target_prompt(tokenizer, k=None):
     random_tokens = random.sample(vocab, k)
 
     # Format them into the token identity structure
-    token_identity_prompt = " ; ".join([f"{tok}->{tok}" for tok in random_tokens])
-
+    token_identity_prompt = "; ".join([f"{tok}->{tok}" for tok in random_tokens])
+    token_identity_prompt += ";"
     return token_identity_prompt
