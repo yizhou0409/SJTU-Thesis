@@ -14,10 +14,9 @@ from utils import set_seed, load_jsonl, save_jsonl, construct_prompt
 from parser import *
 from trajectory import *
 from data_loader import load_data
-from python_executor import PythonExecutor
 from model import load_model_and_tokenizer
 from patchscope import *
-
+from evaluate import evaluate
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -128,14 +127,14 @@ def setup(args):
     data_list.append("avg")
     results.append(
         {
-            "acc": sum([result["acc"] for result in results]) / len(results),
+            "acc": sum([result["accuracy_patched"] for result in results]) / len(results),
         }
     )
 
     # print all results
     pad = max([len(data_name) for data_name in data_list])
     print("\t".join(data_name.ljust(pad, " ") for data_name in data_list))
-    print("\t".join([f"{result['acc']:.1f}".ljust(pad, " ") for result in results]))
+    print("\t".join([f"{result['accuracy_patched']:.1f}".ljust(pad, " ") for result in results]))
 
 
 def main(source_model, source_tokenizer, target_model, target_tokenizer, data_name, args):
@@ -186,137 +185,21 @@ def main(source_model, source_tokenizer, target_model, target_tokenizer, data_na
                         target_token_position, 
                         source_token_position)
 
-    """ Original Algorithm
+    with open(out_file, "w") as f:
+        json.dump(outputs, f, indent=4)
 
-    remain_prompts = [(i, prompt) for i, prompt in enumerate(input_prompts)]
-    end_prompts = []
-
-    stop_words = ["</s>", "<|im_end|>", "<|endoftext|>"]
-
-    if args.prompt_type in ["cot"]:
-        stop_words.append("\n\nQuestion:")
-
-    # start inference
-    # measure time use
-    start_time = time.time()
-    current_prompts = remain_prompts
-    if len(current_prompts) == 0:
-        break
-
-    outputs = generate_completions(
-        model=llm,
-        tokenizer=tokenizer,
-        prompts=prompts,
-        max_new_tokens=args.max_tokens_per_call,
-        batch_size=16,
-        stop_id_sequences=stop_words,
-    )
-
-    assert len(outputs) == len(current_prompts)
-
-    """
-    #TODO: Process all outputs
-    # process all outputs
-    remain_prompts = []
-    remain_codes = []
-    for (i, query), output in zip(current_prompts, outputs):
-        output = output.rstrip()
-        query += output
-        elif args.prompt_type == "cot":
-            end_prompts.append((i, query))
-        elif "boxed" not in output and output.endswith("```"):
-            program = extract_program(query)
-            remain_prompts.append((i, query))
-            remain_codes.append(program)
-        else:
-            end_prompts.append((i, query))
-
-    # execute the remain prompts
-    remain_results = executor.batch_apply(remain_codes)
-    for k in range(len(remain_prompts)):
-        i, query = remain_prompts[k]
-        res, report = remain_results[k]
-        exec_result = res if res else report
-        if "pal" in args.prompt_type:
-            exec_result = "\\boxed{" + exec_result + "}"
-        exec_result = f"\n```output\n{exec_result}\n```\n"
-        query += exec_result
-        # not end
-        if epoch == max_func_call - 1:
-            query += "\nReach max function call limit."
-        remain_prompts[k] = (i, query)
-
-    # unsolved samples
-    print("Unsolved samples:", len(remain_prompts))
-    end_prompts.extend(remain_prompts)
-    # sort by idx
-    end_prompts = sorted(end_prompts, key=lambda x: x[0])
-
-    # remove input_prompt from end_prompt
-    codes = []
-    assert len(input_prompts) == len(end_prompts)
-    for i in range(len(input_prompts)):
-        _, end_prompt = end_prompts[i]
-        code = end_prompt.split(input_prompts[i])[-1].strip()
-        for stop_word in stop_words:
-            if stop_word in code:
-                code = code.split(stop_word)[0].strip()
-        codes.append(code)
-
-    # extract preds
-    results = [
-        run_execute(executor, code, args.prompt_type, data_name) for code in codes
-    ]
-    time_use = time.time() - start_time
-
-    # put results back to examples
-    all_samples = []
-    for i, sample in enumerate(samples):
-        code = codes[i * args.n_sampling : (i + 1) * args.n_sampling]
-        result = results[i * args.n_sampling : (i + 1) * args.n_sampling]
-        preds = [item[0] for item in result]
-        reports = [item[1] for item in result]
-        for j in range(len(preds)):
-            if sample["gt"] in ["A", "B", "C", "D", "E"] and preds[j] not in [
-                "A",
-                "B",
-                "C",
-                "D",
-                "E",
-            ]:
-                preds[j] = choice_answer_clean(code[j])
-            elif is_multi_choice(sample["gt"]) and not is_multi_choice(preds[j]):
-                # remove any non-choice char
-                preds[j] = "".join(
-                    [c for c in preds[j] if c in ["A", "B", "C", "D", "E"]]
-                )
-
-        sample.pop("prompt")
-        sample.update({"code": code, "pred": preds, "report": reports})
-        all_samples.append(sample)
-
-    # add processed samples
-    all_samples.extend(processed_samples)
-    all_samples, result_json = evaluate(
-        samples=all_samples,
-        data_name=data_name,
-        prompt_type=args.prompt_type,
-        execute=True,
-    )
-
-    # save outputs
-    if len(processed_samples) < len(all_samples) and args.save_outputs:
-        save_jsonl(all_samples, out_file)
-
+    # Process all outputs
+    result_json = evaluate(outputs)
+    time.use = time.time - start_time
     result_json["time_use_in_second"] = time_use
     result_json["time_use_in_minite"] = (
         f"{int(time_use // 60)}:{int(time_use % 60):02d}"
     )
-
     with open(
         out_file.replace(".jsonl", f"_{args.prompt_type}_metrics.json"), "w"
     ) as f:
         json.dump(result_json, f, indent=4)
+
     return result_json
 
 
