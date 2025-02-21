@@ -22,12 +22,14 @@ def evaluate(outputs):
     accuracy_unpatched = correct_unpatched / total_samples if total_samples > 0 else 0
     accuracy_patched = (correct_patched / patching_attempts) if patching_attempts > 0 else 0
 
-    metrics = {
+    result_json = {
         "total_samples": total_samples,
         "correctly_predicted": correct_unpatched,
         "correctly_predicted_after_patching": correctly_patched
         "accuracy_unpatched": accuracy_unpatched,
         "accuracy_patched": accuracy_patched,
+        "time_use_in_second": -1,
+        "time_use_in_minute": -1,
     }
     
-    return metrics
+    return result_json
