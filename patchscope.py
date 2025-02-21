@@ -1,5 +1,6 @@
 import torch
 from model import *
+from tqdm import tqdm
 
 def generate_response(model, tokenizer, prompt, max_length=512):
     inputs = tokenizer(prompt, return_tensors="pt").to(device)
@@ -37,10 +38,17 @@ def get_hidden_representation(model, tokenizer, prompt, device) -> torch.Tensor:
         hooks.append(hook_handle)
 
     with torch.no_grad():
-        _ = source_model(**input_ids)
+        outputs = source_model(**input_ids)
+        logits = outputs.logits  # (batch_size, seq_length, vocab_size)
+
+    last_token_logits = logits[:, -1, :]  # Get last token logits
+
+    predicted_token_id = torch.argmax(last_token_logits, dim=-1)  # Most probable token
+    predicted_text = tokenizer.decode(predicted_token_id, skip_special_tokens=True)
+
     for h in hooks:
         h.remove()
-    return hidden_representation
+    return hidden_representation, predicted_text
 
 # f(h, /theta): Rd -> Rd*
 def f(h):
@@ -68,6 +76,7 @@ def patch_target_model(
             output[0][:, target_token_position, :] = hidden_representation[:, source_token_position, source_layer_id, :]
             return output
         return patching_hook
+
     layers, n_layers = get_layers_to_enumerate(target_model)
     hook_handle = layers[target_layer_id].register_forward_hook(
         patching_handler(source_layer_id=source_layer_id, 
@@ -77,14 +86,88 @@ def patch_target_model(
 
     try:
         inputs = target_tokenizer(target_prompt, return_tensors="pt").to(device)
-        with torch.no_grad():
-            output_ids = target_model.generate(**inputs, max_length=512)
         
-        # Decode the output tokens into text
-        generated_text = target_tokenizer.decode(output_ids[0], skip_special_tokens=True)
+        with torch.no_grad():
+            outputs = target_model(**inputs)  # Get logits instead of generating tokens
+
+        logits = outputs.logits  # Shape: (batch_size, seq_length, vocab_size)
+        last_token_logits = logits[:, -1, :]  # Extract logits for the last token
+
+        predicted_token_id = torch.argmax(last_token_logits, dim=-1)  # Get the most probable next token
+        predicted_token = target_tokenizer.decode(predicted_token_id, skip_special_tokens=True)
+
     finally:
         hook_handle.remove()
-    return generated_text
+    
+    return predicted_token
+
+
+def patchscope(
+        samples, 
+        source_model, 
+        source_tokenizer, 
+        target_model, 
+        target_tokenizer, 
+        device, 
+        source_layer_id, 
+        target_layer_id, 
+        target_token_position, 
+        source_token_position
+):
+    """
+    Operates patchscope on given samples:
+    1. Checks if the target model generates the correct answer without patching.
+    2. If correct, applies patching and checks the new prediction.
+    
+    Args:
+    - samples: List of sample dictionaries containing prompts and ground truth answers.
+    - source_model: The model providing hidden representations.
+    - source_tokenizer: Tokenizer for the source model.
+    - target_model: The model to be patched.
+    - target_tokenizer: Tokenizer for the target model.
+    - device: The computation device (CPU/GPU).
+    - source_layer_id: The layer index from which to extract the hidden representation.
+    - target_layer_id: The layer index in the target model where patching is applied.
+    - target_token_position: Token index in the target model where the patching is applied.
+    - source_token_position: Token index in the source model where the hidden state is extracted.
+    
+    Returns:
+    - results: A list containing results for each sample.
+    """
+    results = []
+
+    for sample in tqdm(samples, total=len(samples)):
+        idx = sample["idx"]
+        source_prompt = sample["source_prompt"]
+        target_prompt = sample["target_prompt"]
+        ground_truth = sample["gt"]
+
+        # Get hidden representation and unpatched prediction in a single pass
+        hidden_representation, unpatched_prediction = get_hidden_representation(
+            source_model, source_tokenizer, source_prompt, device
+        )
+
+        if unpatched_target_pred[0] == ground_truth.strip()[0]:
+            # Step 2: If correct, apply patching and check the new prediction
+            patched_prediction = patch_target_model(
+                target_model, target_tokenizer, target_prompt,
+                source_layer_id, target_layer_id,
+                target_token_position, source_token_position,
+                hidden_representation, device
+            )
+        else:
+            patched_prediction = None  # Skip patching if the original answer is incorrect
+
+        results.append({
+            "idx": idx,
+            "question": sample["question"],
+            "gt": ground_truth,
+            "unpatched_pred": unpatched_target_pred,
+            "patched_pred": patched_prediction
+        })
+
+    return results
+
 
 if __name__=="__main__":
      # Load model and tokenizer
