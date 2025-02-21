@@ -2,6 +2,12 @@ import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 import random
 
+def set_seed(seed: int = 42) -> None:
+    np.random.seed(seed)
+    random.seed(seed)
+    os.environ["PYTHONHASHSEED"] = str(seed)
+    print(f"Random seed set as {seed}")
+
 def lower_keys(example):
     new_example = {}
     for key, value in example.items():
