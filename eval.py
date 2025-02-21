@@ -15,7 +15,7 @@ from parser import *
 from trajectory import *
 from data_loader import load_data
 from python_executor import PythonExecutor
-from model import load_model_and_tokenizer, generate_completions
+from model import load_model_and_tokenizer
 from patchscope import *
 
 
@@ -33,12 +33,13 @@ def parse_args():
     parser.add_argument("--prompt_type", default="direct", type=str)
     parser.add_argument("--num_test_sample", default=-1, type=int)  # -1 for full data
     parser.add_argument("--split", default="test", type=str)
-    parser.add_argument("--seed", default=0, type=int)
     parser.add_argument("--start", default=0, type=int)
     parser.add_argument("--end", default=-1, type=int)
     parser.add_argument("--temperature", default=0, type=float)
     parser.add_argument("--top_p", default=1, type=float)
     parser.add_argument("--max_tokens_per_call", default=2048, type=int)
+    parser.add_argument("--seed", default=42, type=int)
+    parser.add_argument("--n_samples", default=100, type=int)
     parser.add_argument("--use_safetensors", action="store_false")
     parser.add_argument("--shuffle", action="store_true")
     parser.add_argument("--save_outputs", action="store_true")
@@ -137,7 +138,7 @@ def setup(args):
     print("\t".join([f"{result['acc']:.1f}".ljust(pad, " ") for result in results]))
 
 
-def main(source_model, target_model, source_tokenizer, target_tokenizer, data_name, args):
+def main(source_model, source_tokenizer, target_model, target_tokenizer, data_name, args):
     examples, processed_samples, out_file = prepare_data(data_name, args)
     print("=" * 50)
     print("data:", data_name, " ,remain samples:", len(examples))
@@ -172,6 +173,21 @@ def main(source_model, target_model, source_tokenizer, target_tokenizer, data_na
 
         samples.append(sample)
 
+    samples_of_samples = random.sample(samples, args.n_samples)
+
+    outputs = patchscope(samples_of_samples, 
+                        source_model, 
+                        source_tokenizer, 
+                        target_model, 
+                        target_tokenizer, 
+                        device, 
+                        source_layer_id, 
+                        target_layer_id, 
+                        target_token_position, 
+                        source_token_position)
+
+    """ Original Algorithm
+
     remain_prompts = [(i, prompt) for i, prompt in enumerate(input_prompts)]
     end_prompts = []
 
@@ -198,17 +214,14 @@ def main(source_model, target_model, source_tokenizer, target_tokenizer, data_na
 
     assert len(outputs) == len(current_prompts)
 
+    """
+    #TODO: Process all outputs
     # process all outputs
     remain_prompts = []
     remain_codes = []
     for (i, query), output in zip(current_prompts, outputs):
         output = output.rstrip()
         query += output
-        if args.prompt_type == "pal":
-            remain_prompts.append((i, query))
-            if "```python" in output:
-                output = extract_program(query)
-            remain_codes.append(output)
         elif args.prompt_type == "cot":
             end_prompts.append((i, query))
         elif "boxed" not in output and output.endswith("```"):
