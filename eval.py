@@ -4,7 +4,6 @@ import argparse
 import time
 import torch
 import json
-from vllm import LLM, SamplingParams
 from datetime import datetime
 from tqdm import tqdm
 
@@ -54,16 +53,13 @@ def setup(args):
     source_model, source_tokenizer = load_model_and_tokenizer(
         model_name=args.source_model_name,
         load_in_half=True,
-        use_fast_tokenizer=True,
         use_safetensors=args.use_safetensors,
-        device=device
     )
+
     target_model, target_tokenizer = load_model_and_tokenizer(
         model_name=args.target_model_name,
         load_in_half=True,
-        use_fast_tokenizer=True,
         use_safetensors=args.use_safetensors,
-        device=device
     )    
 
     if torch.cuda.device_count() > 1:
