@@ -13,15 +13,15 @@ def generate_response(model, tokenizer, prompt, max_length=512):
     return response
 
 # Get h_l^i in the execution of source model M on input sequence S
-def get_hidden_representation(model, tokenizer, prompt, device) -> torch.Tensor:
+def get_hidden_representation(source_model, source_tokenizer, prompt, device) -> torch.Tensor:
     """ Get the residual stream activations of the source model for the input prompt.
     
     Returns:
     hidden_representation: torch.Tensor [batch_size, seq_len, n_layers, hidden_size]
     """
-    input_ids = tokenizer(prompt, return_tensors='pt', truncation=True).to(device)
-    layers, n_layers = get_layers_to_enumerate(model)
-    hidden_representation = torch.zeros((input_ids['input_ids'].shape[0], input_ids['input_ids'].shape[1], n_layers, model.config.hidden_size)).to(device)
+    input_ids = source_tokenizer(prompt, return_tensors='pt', truncation=True).to(device)
+    layers, n_layers = get_layers_to_enumerate(source_model)
+    hidden_representation = torch.zeros((input_ids['input_ids'].shape[0], input_ids['input_ids'].shape[1], n_layers, source_model.config.hidden_size)).to(device)
 
     def store_source_activations(layer_id):
         def hook_fn(module, input, output):
@@ -44,7 +44,7 @@ def get_hidden_representation(model, tokenizer, prompt, device) -> torch.Tensor:
     last_token_logits = logits[:, -1, :]  # Get last token logits
 
     predicted_token_id = torch.argmax(last_token_logits, dim=-1)  # Most probable token
-    predicted_text = tokenizer.decode(predicted_token_id, skip_special_tokens=True)
+    predicted_text = source_tokenizer.decode(predicted_token_id, skip_special_tokens=True)
 
     for h in hooks:
         h.remove()
@@ -147,7 +147,7 @@ def patchscope(
             source_model, source_tokenizer, source_prompt, device
         )
 
-        if unpatched_target_pred[0] == ground_truth.strip()[0]:
+        if unpatched_prediction[0] == ground_truth.strip()[0]:
             # Step 2: If correct, apply patching and check the new prediction
             patched_prediction = patch_target_model(
                 target_model, target_tokenizer, target_prompt,
@@ -162,7 +162,7 @@ def patchscope(
             "idx": idx,
             "question": sample["question"],
             "gt": ground_truth,
-            "unpatched_pred": unpatched_target_pred,
+            "unpatched_pred": unpatched_prediction,
             "patched_pred": patched_prediction
         })
 

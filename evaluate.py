@@ -25,11 +25,12 @@ def evaluate(outputs):
     result_json = {
         "total_samples": total_samples,
         "correctly_predicted": correct_unpatched,
-        "correctly_predicted_after_patching": correctly_patched,
+        "correctly_predicted_after_patching": correct_patched,
         "accuracy_unpatched": accuracy_unpatched,
         "accuracy_patched": accuracy_patched,
         "time_use_in_second": -1,
         "time_use_in_minute": -1,
     }
     
+    print(result_json)
     return result_json

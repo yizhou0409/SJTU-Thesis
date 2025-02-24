@@ -4,16 +4,15 @@ import argparse
 import time
 import torch
 import json
-from datetime import datetime
+
 from tqdm import tqdm
 
 from transformers import AutoTokenizer, AutoModelForCausalLM
 
 from evaluate import evaluate
-from utils import set_seed, load_jsonl, save_jsonl, construct_prompt
+from utils import *
 from parser import *
-from trajectory import *
-from data_loader import load_data
+from data_loader import *
 from model import load_model_and_tokenizer
 from patchscope import *
 from evaluate import evaluate
@@ -29,7 +28,7 @@ def parse_args():
     parser.add_argument("--source_token_id", default=-1, type=int)
     parser.add_argument("--target_token_id", default=-1, type=int)
     parser.add_argument("--output_dir", default="./output", type=str)
-    parser.add_argument("--prompt_type", default="direct", type=str)
+    parser.add_argument("--prompt_type", default="very_direct", type=str)
     parser.add_argument("--num_test_sample", default=-1, type=int)  # -1 for full data
     parser.add_argument("--split", default="test", type=str)
     parser.add_argument("--start", default=0, type=int)
@@ -46,6 +45,7 @@ def parse_args():
 
     args = parser.parse_args()
     return args
+
 
 def setup(args):
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -80,9 +80,10 @@ def setup(args):
     # print all results
     pad = max(len(data_name) for data_name in data_list)
     print("\t".join(data_name.ljust(pad, " ") for data_name in data_list))
-    print("\t".join([f"{result['accuracy_patched']:.1f}".ljust(pad, " ") for result in results]))
+    print("\t".join([f'{result["accuracy_patched"]:.1f}'.ljust(pad, " ") for result in results]))
 
 def main(source_model, target_model, source_tokenizer, target_tokenizer, data_name, args, device):
+    start_time = time.time()
     examples, processed_samples, out_file = prepare_data(data_name, args)
     print("=" * 50)
     print("data:", data_name, ", remain samples:", len(examples))
@@ -129,7 +130,6 @@ def main(source_model, target_model, source_tokenizer, target_tokenizer, data_na
         json.dump(outputs, f, indent=4)
 
     # Process all outputs
-    start_time = time.time()
     result_json = evaluate(outputs)
     time_use = time.time() - start_time
     result_json["time_use_in_second"] = time_use

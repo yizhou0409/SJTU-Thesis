@@ -1,12 +1,27 @@
 import torch 
 from transformers import AutoModelForCausalLM, AutoTokenizer
 import random
+import numpy as np
+import os
+from typing import Iterable, Union, Any
+from pathlib import Path
+import json
 
 def set_seed(seed: int = 42) -> None:
     np.random.seed(seed)
     random.seed(seed)
     os.environ["PYTHONHASHSEED"] = str(seed)
     print(f"Random seed set as {seed}")
+
+def load_jsonl(file: Union[str, Path]) -> Iterable[Any]:
+    with open(file, "r", encoding="utf-8") as f:
+        for line in f:
+            try:
+                yield json.loads(line)
+            except:
+                print("Error in loading:", line)
+                exit()
+
 
 def lower_keys(example):
     new_example = {}
@@ -17,8 +32,6 @@ def lower_keys(example):
         else:
             new_example[key] = value
     return new_example
-
-import json
 
 
 def get_examples():
@@ -140,8 +153,8 @@ PROMPT_TEMPLATES = {
 
 
 def construct_prompt(example, data_name, args):
-    else:
-        demos = load_prompt(data_name, args.prompt_type)
+
+    demos = load_prompt(data_name, args.prompt_type)
     prompt_type = args.prompt_type
     prompt_temp = PROMPT_TEMPLATES[args.prompt_type]
 
@@ -172,7 +185,7 @@ def construct_prompt(example, data_name, args):
             full_prompt = demo_prompt + splitter + example["question"]
             full_prompt = input_template.format(input=full_prompt)
         else:
-
+            full_prompt = demo_prompt + splitter + context
 
     return full_prompt.strip(" ")  # important!
 
