@@ -28,7 +28,7 @@ def parse_args():
     parser.add_argument("--source_token_id", default=-1, type=int)
     parser.add_argument("--target_token_id", default=-1, type=int)
     parser.add_argument("--output_dir", default="./output", type=str)
-    parser.add_argument("--prompt_type", default="very_direct", type=str)
+    parser.add_argument("--prompt_type", default="qwen_direct", type=str)
     parser.add_argument("--num_test_sample", default=-1, type=int)  # -1 for full data
     parser.add_argument("--split", default="test", type=str)
     parser.add_argument("--start", default=0, type=int)
@@ -75,11 +75,12 @@ def setup(args):
 
     # add "avg" result to data_list and results
     data_list.append("avg")
-    results.append({"acc": sum([result["accuracy_patched"] for result in results]) / len(results)})
+    results.append({"accuracy_patched": sum([result["accuracy_patched"] for result in results]) / len(results)})
 
     # print all results
     pad = max(len(data_name) for data_name in data_list)
     print("\t".join(data_name.ljust(pad, " ") for data_name in data_list))
+    print(results)
     print("\t".join([f'{result["accuracy_patched"]:.1f}'.ljust(pad, " ") for result in results]))
 
 def main(source_model, target_model, source_tokenizer, target_tokenizer, data_name, args, device):
@@ -114,7 +115,7 @@ def main(source_model, target_model, source_tokenizer, target_tokenizer, data_na
         samples.append(sample)
 
     samples_of_samples = random.sample(samples, args.n_samples)
-
+    print(samples_of_samples)
     outputs = patchscope(samples_of_samples, 
                         source_model, 
                         source_tokenizer, 

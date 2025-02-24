@@ -112,8 +112,10 @@ def load_prompt(data_name, prompt_type, num_shots=0):
     return EXAMPLES[data_name][:num_shots]
 
 PROMPT_TEMPLATES = {
-    "very_direct": (
-        "{input}\nPlease reason in your mind and directly your put final answer in the next token.",
+    "qwen_direct": (
+        "<|im_start|>system\nYou are a helpful assistant.<|im_end|>\n"
+        "<|im_start|>user\n{input}\nPlease do not say any other word but only give the final answer.<|im_end|>\n"
+        "<|im_start|>assistant\n",
         "{output}",
         "\n\n",
     ),

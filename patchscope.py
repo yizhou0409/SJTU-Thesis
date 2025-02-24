@@ -178,6 +178,3 @@ if __name__=="__main__":
     source_prompt = "What is the result of 1*1+1?"
     target_prompt = "What is the result of 1*1+1?"
     print("Response: ", generate_response(source_model, source_tokenizer, source_prompt))
-    hidden_representation = get_hidden_representation(source_model, source_tokenizer, source_prompt, device)
-    response = patch_target_model(target_model=target_model, target_tokenizer=target_tokenizer, target_prompt=target_prompt, source_layer_id=0, target_layer_id=0, source_token_position=0, target_token_position=0, hidden_representation=f(hidden_representation), device=device)
-    print("Modified Response: ", response)
