@@ -22,13 +22,14 @@ def parse_args():
     parser.add_argument("--data_names", default="gsm8k,math", type=str)
     parser.add_argument("--data_dir", default="./data", type=str)
     parser.add_argument("--source_model_name", default="Qwen/Qwen2.5-Math-1.5B-Instruct", type=str)
-    parser.add_argument("--target_model_name", default="Qwen/Qwen2.5-Math-1.5B-Instruct", type=str)
-    parser.add_argument("--source_layer_id", default=0, type=int)
-    parser.add_argument("--target_layer_id", default=0, type=int)
+    parser.add_argument("--target_model_name", default="Qwen/Qwen2.5-1.5B", type=str)
+    parser.add_argument("--source_layer_id", default=-2, type=int)
+    parser.add_argument("--target_layer_id", default=-1, type=int)
     parser.add_argument("--source_token_id", default=-1, type=int)
     parser.add_argument("--target_token_id", default=-1, type=int)
     parser.add_argument("--output_dir", default="./output", type=str)
     parser.add_argument("--prompt_type", default="qwen_direct", type=str)
+    parser.add_argument("--num_shots", default=2, type=int)
     parser.add_argument("--num_test_sample", default=-1, type=int)  # -1 for full data
     parser.add_argument("--split", default="test", type=str)
     parser.add_argument("--start", default=0, type=int)
@@ -37,7 +38,7 @@ def parse_args():
     parser.add_argument("--top_p", default=1, type=float)
     parser.add_argument("--max_tokens_per_call", default=2048, type=int)
     parser.add_argument("--seed", default=42, type=int)
-    parser.add_argument("--n_samples", default=100, type=int)
+    parser.add_argument("--n_samples", default=500, type=int)
     parser.add_argument("--use_safetensors", action="store_false")
     parser.add_argument("--shuffle", action="store_true")
     parser.add_argument("--save_outputs", action="store_true")
@@ -99,24 +100,28 @@ def main(source_model, target_model, source_tokenizer, target_tokenizer, data_na
             continue
         gt_ans = parse_ground_truth(example, data_name)
         example["gt_ans"] = gt_ans
-        source_full_prompt = construct_prompt(example, data_name, args)
+
+        source_full_prompt = ""
+        if args.num_shots>0:
+            source_full_prompt = construct_few_shot_prompt(example, data_name, args)
+        else:
+            souce_full_prompt = construct_prompt(example, data_name, args)
         target_full_prompt = generate_target_prompt(target_tokenizer)
         
         if idx == args.start:
             print(source_full_prompt)
 
-        sample = {
-            "idx": idx,
-            "question": example["question"],
-            "gt": gt_ans,
-            "source_prompt": source_full_prompt,
-            "target_prompt": target_full_prompt
-        }
-        samples.append(sample)
+        if get_digit(gt_ans):
+            sample = {
+                "idx": idx,
+                "question": example["question"],
+                "gt": gt_ans,
+                "source_prompt": source_full_prompt,
+                "target_prompt": target_full_prompt
+            }
+            samples.append(sample)
 
-    samples_of_samples = random.sample(samples, args.n_samples)
-    print(samples_of_samples)
-    outputs = patchscope(samples_of_samples, 
+    outputs = patchscope(samples, 
                         source_model, 
                         source_tokenizer, 
                         target_model, 

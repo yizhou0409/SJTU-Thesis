@@ -3,26 +3,14 @@ from model import *
 from utils import *
 from tqdm import tqdm
 
-def generate_response(model, tokenizer, prompt, max_length=512):
-    inputs = tokenizer(prompt, return_tensors="pt").to(device)
-    with torch.no_grad():
-        outputs = model(**inputs)
-        logits = outputs.logits  # (batch_size, seq_length, vocab_size)
-
-    last_token_logits = logits[:, -1, :]  # Get last token logits
-
-    predicted_token_id = torch.argmax(last_token_logits, dim=-1)  # Most probable token
-    predicted_text = tokenizer.decode(predicted_token_id, skip_special_tokens=True)
-
-    return predicted_text
-
 # Get h_l^i in the execution of source model M on input sequence S
-def get_hidden_representation(source_model, source_tokenizer, prompt, device) -> torch.Tensor:
+def get_hidden_representation(source_model, source_tokenizer, prompt, n_tokens, device) -> torch.Tensor:
     """ Get the residual stream activations of the source model for the input prompt.
     
     Returns:
     hidden_representation: torch.Tensor [batch_size, seq_len, n_layers, hidden_size]
     """
+
     input_ids = source_tokenizer(prompt, return_tensors='pt', truncation=True).to(device)
     layers, n_layers = get_layers_to_enumerate(source_model)
     hidden_representation = torch.zeros((input_ids['input_ids'].shape[0], input_ids['input_ids'].shape[1], n_layers, source_model.config.hidden_size)).to(device)
@@ -32,23 +20,21 @@ def get_hidden_representation(source_model, source_tokenizer, prompt, device) ->
             hidden_representation[:, :, layer_id, :] = output[0].detach()
         return hook_fn
     
-    hooks = []
+    hooks = [layer.register_forward_hook(store_source_activations(layer_id)) for layer_id, layer in enumerate(layers)]
 
-
-    for layer_id, layer in enumerate(layers):
-        hook_handle = layer.register_forward_hook(
-            store_source_activations(layer_id)
-        )
-        hooks.append(hook_handle)
-
+    predicted_text = ""
     with torch.no_grad():
-        outputs = source_model(**input_ids)
-        logits = outputs.logits  # (batch_size, seq_length, vocab_size)
+        for _ in range(n_tokens):
+            outputs = source_model(**input_ids)
+            logits = outputs.logits  # (batch_size, seq_length, vocab_size)
 
-    last_token_logits = logits[:, -1, :]  # Get last token logits
+            if _ == 0:  # Store hidden representation only for the first token
+                hidden_representation = hidden_representation.clone()
 
-    predicted_token_id = torch.argmax(last_token_logits, dim=-1)  # Most probable token
-    predicted_text = source_tokenizer.decode(predicted_token_id, skip_special_tokens=True)
+            predicted_token_id = torch.argmax(logits[:, -1, :], dim=-1)
+            predicted_text += source_tokenizer.decode(predicted_token_id, skip_special_tokens=True)
+            
+            input_ids = {"input_ids": torch.cat([input_ids["input_ids"], predicted_token_id.unsqueeze(-1)], dim=-1)}
 
     for h in hooks:
         h.remove()
@@ -144,10 +130,10 @@ def patchscope(
         source_prompt = sample["source_prompt"]
         target_prompt = sample["target_prompt"]
         ground_truth = sample["gt"]
-
+        n_digits = get_digit(ground_truth)
         # Get hidden representation and unpatched prediction in a single pass
         hidden_representation, unpatched_prediction = get_hidden_representation(
-            source_model, source_tokenizer, source_prompt, device
+            source_model, source_tokenizer, source_prompt, n_digits, device
         )
 
         # Step 2: If correct, apply patching and check the new prediction
@@ -168,14 +154,34 @@ def patchscope(
 
     return results
 
+def generate_few_shot_prompt(few_shot_examples, new_question):
+    """
+    Generates a few-shot prompt given example question-answer pairs and a new question.
+    
+    Args:
+        few_shot_examples (list of dict): List of {"question": str, "answer": str} pairs.
+        new_question (str): The new question for which the model should generate an answer.
+    
+    Returns:
+        str: A formatted few-shot prompt.
+    """
+    pre_prompt = "Just answer next question in the following format: \n"
+    formatted_examples = "\n".join(
+        [f"Q: {ex['question']}\nA: {ex['answer']}" for ex in few_shot_examples]
+    )
+    prompt = pre_prompt + f" {formatted_examples}\nQ: {new_question}\nA: "
+    return prompt
 
 if __name__=="__main__":
      # Load model and tokenizer
-    source_model, source_tokenizer= load_model_and_tokenizer("Qwen/Qwen2.5-1.5B")
+    source_model, source_tokenizer= load_model_and_tokenizer("Qwen/Qwen2.5-Math-1.5B-Instruct")
     target_model, target_tokenizer= load_model_and_tokenizer("Qwen/Qwen2.5-Math-1.5B-Instruct")
     # Ensure CUDA is available
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    source_prompt = generate_target_prompt(source_tokenizer)
-    print(source_prompt)
+    few_shot_examples = [{"question": "There are 15 trees in the grove. Grove workers will plant trees in the grove today. After they are done, there will be 21 trees. How many trees did the grove workers plant today?", "answer": "6"},
+                        {"question":"If there are 3 cars in the parking lot and 2 more cars arrive, how many cars are in the parking lot?", "answer": "5"},
+                        ]
+
+    source_prompt = generate_few_shot_prompt(few_shot_examples, "Jeff\u2019s work is 3 miles away.  He walks there and back each day he works.  How many miles does he walk if he has to work 5 times a week?")
     target_prompt = "What is the result of 1*1+1?"
     print("Response: ", generate_response(source_model, source_tokenizer, source_prompt))
