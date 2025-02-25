@@ -1,16 +1,20 @@
 import torch
 from model import *
+from utils import *
 from tqdm import tqdm
 
 def generate_response(model, tokenizer, prompt, max_length=512):
     inputs = tokenizer(prompt, return_tensors="pt").to(device)
     with torch.no_grad():
-        output_ids = model.generate(**inputs, max_length=max_length)
-    
-    # Decode the output tokens into text
-    response = tokenizer.decode(output_ids[0], skip_special_tokens=True)
-    
-    return response
+        outputs = model(**inputs)
+        logits = outputs.logits  # (batch_size, seq_length, vocab_size)
+
+    last_token_logits = logits[:, -1, :]  # Get last token logits
+
+    predicted_token_id = torch.argmax(last_token_logits, dim=-1)  # Most probable token
+    predicted_text = tokenizer.decode(predicted_token_id, skip_special_tokens=True)
+
+    return predicted_text
 
 # Get h_l^i in the execution of source model M on input sequence S
 def get_hidden_representation(source_model, source_tokenizer, prompt, device) -> torch.Tensor:
@@ -72,7 +76,6 @@ def patch_target_model(
                             target_token_position: int,
                             source_token_position: int):
         def patching_hook(module, input, output):
-            print(output[0][:, target_token_position, :], hidden_representation[:, source_token_position, source_layer_id, :])
             output[0][:, target_token_position, :] = hidden_representation[:, source_token_position, source_layer_id, :]
             return output
         return patching_hook
@@ -147,16 +150,13 @@ def patchscope(
             source_model, source_tokenizer, source_prompt, device
         )
 
-        if unpatched_prediction[0] == ground_truth.strip()[0]:
-            # Step 2: If correct, apply patching and check the new prediction
-            patched_prediction = patch_target_model(
-                target_model, target_tokenizer, target_prompt,
-                source_layer_id, target_layer_id,
-                target_token_position, source_token_position,
-                hidden_representation, device
-            )
-        else:
-            patched_prediction = None  # Skip patching if the original answer is incorrect
+        # Step 2: If correct, apply patching and check the new prediction
+        patched_prediction = patch_target_model(
+            target_model, target_tokenizer, target_prompt,
+            source_layer_id, target_layer_id,
+            target_token_position, source_token_position,
+            hidden_representation, device
+        )
 
         results.append({
             "idx": idx,
@@ -171,10 +171,11 @@ def patchscope(
 
 if __name__=="__main__":
      # Load model and tokenizer
-    source_model, source_tokenizer= load_model_and_tokenizer("Qwen/Qwen2.5-Math-1.5B-Instruct")
+    source_model, source_tokenizer= load_model_and_tokenizer("Qwen/Qwen2.5-1.5B")
     target_model, target_tokenizer= load_model_and_tokenizer("Qwen/Qwen2.5-Math-1.5B-Instruct")
     # Ensure CUDA is available
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    source_prompt = "What is the result of 1*1+1?"
+    source_prompt = generate_target_prompt(source_tokenizer)
+    print(source_prompt)
     target_prompt = "What is the result of 1*1+1?"
     print("Response: ", generate_response(source_model, source_tokenizer, source_prompt))
