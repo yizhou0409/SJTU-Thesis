@@ -14,8 +14,7 @@ def load_model_and_tokenizer(
     if not tokenizer_name:
         tokenizer_name = model_name
     tokenizer = AutoTokenizer.from_pretrained(tokenizer_name,padding_side=padding_side, trust_remote_code=True)
-    # tokenizer = AutoTokenizer.from_pretrained(tokenizer_name, legacy=False, use_fast=use_fast_tokenizer, padding_side=padding_side, trust_remote_code=True)
-
+    
     # set pad token to eos token if pad token is not set
     if tokenizer.pad_token is None:
         if tokenizer.unk_token:
@@ -28,9 +27,6 @@ def load_model_and_tokenizer(
             raise ValueError("You are using a new tokenizer without a pad token."
                             "This is not supported by this script.")
 
-    # if tokenizer.pad_token is None:
-    #     tokenizer.pad_token = tokenizer.unk_token
-    #     tokenizer.pad_token_id = tokenizer.unk_token_id
     model = AutoModelForCausalLM.from_pretrained(model_name,
                                                     torch_dtype=torch.float16,
                                                     device_map=device_map,

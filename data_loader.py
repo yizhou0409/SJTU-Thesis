@@ -49,7 +49,6 @@ def prepare_data(data_name, args):
 
     # sample `num_test_sample` from dataset
     if args.num_test_sample > 0:
-        # examples = random.sample(examples, min(args.num_test_sample, len(examples)))
         examples = examples[: args.num_test_sample]
 
     # shuffle
@@ -69,25 +68,5 @@ def prepare_data(data_name, args):
     out_file = f"{output_dir}/{data_name}/{out_file_prefix}_s{args.start}_e{args.end}.jsonl"
     os.makedirs(f"{output_dir}/{data_name}", exist_ok=True)
     return examples, [], out_file
-"""
-    # load all processed samples
-    processed_samples = []
-    if not args.overwrite:
-        processed_files = [
-            f
-            for f in os.listdir(f"{output_dir}/{data_name}/")
-            if f.endswith(".jsonl") and f.startswith(out_file_prefix)
-        ]
-        for f in processed_files:
-            processed_samples.extend(
-                list(load_jsonl(f"{output_dir}/{data_name}/{f}"))
-            )
 
-    # dedepulicate
-    processed_samples = {sample["idx"]: sample for sample in processed_samples}
-    processed_idxs = list(processed_samples.keys())
-    processed_samples = list(processed_samples.values())
-    examples = [example for example in examples if example["idx"] not in processed_idxs]
-    return examples, processed_samples, out_file
-"""
     

@@ -106,15 +106,13 @@ def load_prompt(data_name, prompt_type, num_shots=0):
         data_name = "gsm8k"
     if data_name in ["math_oai", "hungarian_exam", "math-oai", "aime24", "amc23"]:
         data_name = "math"
-    if data_name in ["sat_math"]:
-        data_name = "mmlu_stem"
 
     return EXAMPLES[data_name][:num_shots]
 
 PROMPT_TEMPLATES = {
     "qwen_direct": (
-        "<|im_start|>system\nYou are a helpful assistant.<|im_end|>\n"
-        "<|im_start|>user\n{input}\nPlease do not say any other word but only give the final answer.<|im_end|>\n"
+        "<|im_start|>system\nPlease do not say any other word but only give the final answer.<|im_end|>\n"
+        "<|im_start|>user\n{input}\n.<|im_end|>\n"
         "<|im_start|>assistant\n",
         "{output}",
         "\n\n",
@@ -123,12 +121,6 @@ PROMPT_TEMPLATES = {
     "cot": ("Question: {input}\nAnswer: ", "{output}", "\n\n\n"),
     "platypus_fs": (
         "### Instruction:\n{input}\n\n### Response:\n",
-        "{output}",
-        "\n\n\n",
-    ),
-    "deepseek-math": (
-        "User: {input}\nPlease reason step by step, "
-        "and put your final answer within \\boxed{{}}.\n\nAssistant:",
         "{output}",
         "\n\n\n",
     ),
@@ -143,11 +135,6 @@ PROMPT_TEMPLATES = {
         "<|im_start|>system\nPlease reason step by step, and put your final answer within \\boxed{{}}.<|im_end|>\n"
         "<|im_start|>user\n{input}<|im_end|>\n"
         "<|im_start|>assistant\n",
-        "{output}",
-        "\n\n",
-    ),
-    "mathstral": (
-        "{input}\nPlease reason step by step, and put your final answer within \\boxed{{}}.",
         "{output}",
         "\n\n",
     ),
@@ -166,7 +153,7 @@ def construct_prompt(example, data_name, args):
         prompt_temp[1],
         prompt_temp[2],
     )
-    if args.prompt_type == "qwen25-math-cot":
+    if "qwen" in args.prompt_type:
         # Hotfix to support putting all demos into a single turn
         demo_prompt = splitter.join([q + "\n" + a for q, a in demos])
     else:
@@ -182,7 +169,7 @@ def construct_prompt(example, data_name, args):
     ):
         full_prompt = context
     else:
-        if args.prompt_type == "qwen25-math-cot":
+        if "qwen" in args.prompt_type:
             # Hotfix to supportting put all demos into a single turn
             full_prompt = demo_prompt + splitter + example["question"]
             full_prompt = input_template.format(input=full_prompt)
