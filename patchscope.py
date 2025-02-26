@@ -2,6 +2,7 @@ import torch
 from model import *
 from utils import *
 from tqdm import tqdm
+import argparse
 
 # Get h_l^i in the execution of source model M on input sequence S
 def get_hidden_representation(source_model, source_tokenizer, prompt, n_tokens, device) -> torch.Tensor:
@@ -124,7 +125,6 @@ def patchscope(
     - results: A list containing results for each sample.
     """
     results = []
-
     for sample in tqdm(samples, total=len(samples)):
         idx = sample["idx"]
         source_prompt = sample["source_prompt"]
@@ -153,6 +153,91 @@ def patchscope(
         })
 
     return results
+
+def patchscope_eval(
+        samples, 
+        source_model, 
+        source_tokenizer, 
+        target_model, 
+        target_tokenizer, 
+        device, 
+        args
+):
+    hidden_representations = {}
+    results = []
+    remain_samples = []
+    print("Getting the hidden representation......")
+
+    for sample in tqdm(samples, total=len(samples)):
+        idx = sample["idx"]
+        source_prompt = sample["source_prompt"]
+        target_prompt = sample["target_prompt"]
+        ground_truth = sample["gt"]
+        n_digits = get_digit(ground_truth)
+        # Get hidden representation and unpatched prediction in a single pass
+        hidden_representation, unpatched_prediction = get_hidden_representation(
+            source_model, source_tokenizer, source_prompt, n_digits, device
+        )
+        hidden_representations[idx] = hidden_representation
+        # Step 2: If correct, apply patching and check the new prediction
+        patched_prediction = patch_target_model(
+            target_model, target_tokenizer, target_prompt,
+            source_layer_id, target_layer_id,
+            target_token_position, source_token_position,
+            hidden_representation, device
+        )
+
+        source_token_position = 0
+        target_token_position = args.target_token_position
+        if args.eval_source_token=="last_digit":
+            source_token_position = get_digit_token_position(source_prompt, source_tokenizer)
+        elif args.eval_source_token=="last_word":
+            source_token_position = get_word_token_position(source_prompt, source_tokenizer)
+        sample["source_token_position"] = source_token_position
+        sample["target_token_position"] = target_token_position
+
+        results.append({
+            "idx": idx,
+            "question": sample["question"],
+            "gt": ground_truth,
+            "unpatched_pred": unpatched_prediction,
+            "patched_pred": None,
+        })
+        if ground_truth == unpatched_prediction:
+            remain_samples.append(sample)
+
+
+    print("Now working on each layers:")
+    _, n_layers = get_layers_to_enumerate()
+
+    target_layer_id = args.target_layer_id
+
+    accuracy = []
+    length = len(remain_samples)
+    for layer_id in range(n_layers):
+
+        print("Layer {}".format(layer_id))
+        source_layer_id = layer_id
+        correct = 0
+
+        for sample in tqdm(remain_samples, total = length):
+               
+            source_token_position, target_token_position = sample['source_token_position'], sample['target_token_position']
+            hidden_representation = hidden_representations[sample['idx']]
+
+            patched_prediction = patch_target_model(
+            target_model, target_tokenizer, target_prompt,
+            source_layer_id, target_layer_id,
+            target_token_position, source_token_position,
+            hidden_representation, device
+            )
+
+            if patched_prediction == sample["gt"][0]:
+                correct += 1
+        accuracy.append(correct/length)
+
+
+    return results, accuracy
 
 def generate_few_shot_prompt(few_shot_examples, new_question):
     """

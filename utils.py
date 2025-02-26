@@ -5,6 +5,7 @@ import os
 from typing import Iterable, Union, Any
 from pathlib import Path
 import json
+import matplotlib.pyplot as plt
 
 def set_seed(seed: int = 42) -> None:
     np.random.seed(seed)
@@ -32,9 +33,9 @@ def lower_keys(example):
             new_example[key] = value
     return new_example
 
-def get_digit(ground_truth):
-    if isinstance(ground_truth, int) and 0 <= ground_truth <= 99:
-        return len(str(ground_truth))
+def get_digit(num):
+    if isinstance(num, int) and 0 <= num <= 99:
+        return len(str(num))
     return None
 
 def get_examples(prompt_type):
@@ -267,3 +268,38 @@ def generate_target_prompt(tokenizer, k=None):
     token_identity_prompt = "; ".join([f"{tok}->{tok}" for tok in random_tokens])
     token_identity_prompt += ";"
     return token_identity_prompt
+
+import matplotlib.pyplot as plt
+
+def plot_accuracy_curve(accuracy, file_dir=None):
+    """
+    Plots the accuracy curve across different layers.
+
+    Parameters:
+        accuracy (list): A list of accuracy values corresponding to each layer.
+        n_layers (int): The total number of layers.
+
+    Returns:
+        None
+    """
+    layers = list(range(len(accuracy)))  # x-axis: layer indices
+
+    plt.figure(figsize=(8, 5))
+    plt.plot(layers, accuracy, marker='o', linestyle='-', color='b', markersize=6, linewidth=2, label="Accuracy")
+
+    # Beautify the plot
+    plt.xlabel("Layer Index", fontsize=12)
+    plt.ylabel("Accuracy", fontsize=12)
+    plt.title("Accuracy Curve Across Layers", fontsize=14, fontweight='bold')
+    plt.xticks(fontsize=10)
+    plt.yticks(fontsize=10)
+    plt.grid(True, linestyle="--", alpha=0.6)
+    plt.legend(fontsize=12)
+    plt.tight_layout()
+
+    if file_dir:
+        os.makedirs(os.path.dirname(file_dir), exist_ok=True)  # Ensure the directory exists
+        plt.savefig(file_dir, dpi=300, bbox_inches='tight')  # Save with high resolution
+        print(f"Figure saved to {file_dir}")
+    # Show the plot
+    plt.show()

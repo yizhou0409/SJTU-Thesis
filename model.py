@@ -1,5 +1,68 @@
 import torch 
 from transformers import AutoModelForCausalLM, AutoTokenizer
+import re
+
+def last_digit_token_position(sentence: str, tokenizer) -> int:
+    tokens = tokenizer.tokenize(sentence)
+    token_spans = tokenizer(sentence, return_offsets_mapping=True)["offset_mapping"]
+
+    # Find all digits and their character positions in the original sentence
+    digit_positions = [m.start() for m in re.finditer(r'\d', sentence)]
+    if not digit_positions:
+        return None
+
+    last_digit_pos = digit_positions[-1]  # Position of the last digit in the original sentence
+
+    # Find the corresponding token index
+    for i, (start, end) in enumerate(token_spans):
+        if start <= last_digit_pos < end:
+            return -(len(tokens) - i)  # Negative indexing
+
+    return None
+
+def last_word_token_position(sentence: str, tokenizer) -> int:
+    tokens = tokenizer.tokenize(sentence)
+    token_spans = tokenizer(sentence, return_offsets_mapping=True)["offset_mapping"]
+
+    # Find all words (alphanumeric sequences) and their positions
+    word_matches = list(re.finditer(r'\b\w+\b', sentence))
+    if not word_matches:
+        return None
+
+    last_word_pos = word_matches[-1].start()  # Position of the last word in the original sentence
+
+    # Find the corresponding token index
+    for i, (start, end) in enumerate(token_spans):
+        if start <= last_word_pos < end:
+            return -(len(tokens) - i)  # Negative indexing
+
+    return None
+
+def generate_response(model, tokenizer, prompt, max_length=512):
+    inputs = tokenizer(prompt, return_tensors="pt").to(device)
+    
+    with torch.no_grad():
+        outputs = model.generate(**inputs, max_length=max_length)
+    
+    predicted_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
+
+    return predicted_text
+
+def predict_next_token(model, tokenizer, prompt, max_length=512):
+    inputs = tokenizer(prompt, return_tensors="pt").to(device)
+
+
+    with torch.no_grad():
+        outputs = model(**inputs)
+        logits = outputs.logits  # (batch_size, seq_length, vocab_size)
+
+    last_token_logits = logits[:, -1, :]  # Get last token logits
+
+    predicted_token_id = torch.argmax(last_token_logits, dim=-1)  # Most probable token
+    predicted_text = tokenizer.decode(predicted_token_id, skip_special_tokens=True)
+
+    return predicted_text
+
 
 def load_model_and_tokenizer(
         model_name, 
