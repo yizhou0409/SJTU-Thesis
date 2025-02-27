@@ -6,6 +6,8 @@ from typing import Iterable, Union, Any
 from pathlib import Path
 import json
 import matplotlib.pyplot as plt
+import re
+from word2number import w2n
 
 def set_seed(seed: int = 42) -> None:
     np.random.seed(seed)
@@ -32,6 +34,24 @@ def lower_keys(example):
         else:
             new_example[key] = value
     return new_example
+
+def words_to_numbers(sentence: str) -> str:
+    # Regular expression to match number words, including hyphenated cases like "twenty-five"
+    number_word_pattern = re.compile(r'\b(?:zero|one|two|three|four|five|six|seven|eight|nine|ten|'
+                                     r'eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|'
+                                     r'eighteen|nineteen|twenty(?:-\w+)?|thirty(?:-\w+)?|forty(?:-\w+)?|'
+                                     r'fifty(?:-\w+)?|sixty(?:-\w+)?|seventy(?:-\w+)?|eighty(?:-\w+)?|'
+                                     r'ninety(?:-\w+)?|hundred|thousand|million|billion)\b', re.IGNORECASE)
+
+    def replace_match(match):
+        word = match.group(0)
+        try:
+            num = w2n.word_to_num(word)  # Convert number word to digit
+            return str(num)
+        except ValueError:
+            return word  # Return the original word if conversion fails
+
+    return number_word_pattern.sub(replace_match, sentence)
 
 def get_digit(num: str):
     if num.isdigit() and 0 <= int(num) <= 99:
@@ -248,7 +268,7 @@ def construct_few_shot_prompt(example, data_name, args):
     else:
         full_prompt = demo_prompt + splitter + context
 
-    return full_prompt.strip(" ") + " "
+    return words_to_numbers(full_prompt).strip(" ") + " "
 
 
 def generate_target_prompt(tokenizer, k=None):
@@ -261,8 +281,8 @@ def generate_target_prompt(tokenizer, k=None):
     random_tokens = random.sample(vocab, k)
 
     # Format them into the token identity structure
-    token_identity_prompt = "; ".join([f"{tok}->{tok}" for tok in random_tokens])
-    token_identity_prompt += "; "
+    token_identity_prompt = ";".join([f"{tok}={tok}" for tok in random_tokens])
+    token_identity_prompt += ";"
     return token_identity_prompt
 
 import matplotlib.pyplot as plt

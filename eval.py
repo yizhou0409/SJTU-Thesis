@@ -23,16 +23,16 @@ def parse_args():
     parser.add_argument("--data_names", default="gsm8k", type=str)
     parser.add_argument("--data_dir", default="./data", type=str)
     parser.add_argument("--source_model_name", default="Qwen/Qwen2.5-Math-1.5B-Instruct", type=str)
-    parser.add_argument("--target_model_name", default="Qwen/Qwen2.5-1.5B", type=str)
+    parser.add_argument("--target_model_name", default="Qwen/Qwen2.5-Math-1.5B-Instruct", type=str)
     parser.add_argument("--eval", action="store_false")
-    parser.add_argument("--eval_source_token", default="last_digit", type=str)
+    parser.add_argument("--eval_source_token", default="use_arg", type=str) #last_word, last_digit, last, use_arg
     parser.add_argument("--source_layer_id", default=-2, type=int)
-    parser.add_argument("--target_layer_id", default=-2, type=int)
-    parser.add_argument("--source_token_id", default=-1, type=int)
+    parser.add_argument("--target_layer_id", default=-1, type=int)
+    parser.add_argument("--source_token_id", default=-2, type=int)
     parser.add_argument("--target_token_id", default=-1, type=int)
     parser.add_argument("--output_dir", default="./output", type=str)
     parser.add_argument("--prompt_type", default="direct", type=str)
-    parser.add_argument("--num_shots", default=2, type=int)
+    parser.add_argument("--num_shots", default=1, type=int)
     parser.add_argument("--num_test_sample", default=-1, type=int)  # -1 for full data
     parser.add_argument("--split", default="test", type=str)
     parser.add_argument("--start", default=0, type=int)
@@ -205,16 +205,8 @@ def main_eval(source_model, target_model, source_tokenizer, target_tokenizer, da
     
     with open(out_file, "w") as f:
         json.dump(results, f, indent=4)
-
-    result_json = evaluate(results)
-    time_use = time.time() - start_time   
-    result_json["time_use_in_second"] = time_use
-    result_json["time_use_in_minute"] = f"{int(time_use // 60)}:{int(time_use % 60):02d}"
-    result_json["accuracy_patched"] = "unavailable"
-    with open(out_file.replace(".jsonl", f"_{args.prompt_type}_metrics.json"), "w") as f:
-        json.dump(result_json, f, indent=4)
     
-    file_dir = out_file.replace(".jsonl", f"_{result_json['accuracy_unpatched']}_accuracy_curve.png")
+    file_dir = out_file.replace(".jsonl", f"_{args.eval_source_token}_accuracy_curve.png")
     plot_accuracy_curve(accuracy, file_dir)
 
     

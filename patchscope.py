@@ -64,7 +64,7 @@ def patch_target_model(
                             target_token_id: int,
                             source_token_id: int):
         def patching_hook(module, input, output):
-            output[0][:, target_token_id, :] = hidden_representation[:, source_token_id, source_layer_id, :]
+            output[0][:, target_token_id, :] = f(hidden_representation[:, source_token_id, source_layer_id, :])
             return output
         return patching_hook
 
@@ -187,17 +187,13 @@ def patchscope_eval(
             source_token_id = last_digit_token_id(source_prompt, source_tokenizer)
         elif args.eval_source_token=="last_word":
             source_token_id = last_word_token_id(source_prompt, source_tokenizer)
+        elif args.eval_source_token=="last":
+            source_token_id = -1
+        elif args.eval_source_token=="use_arg":
+            source_token_id = args.source_token_id
         sample["source_token_id"] = source_token_id
         sample["target_token_id"] = target_token_id
-        result = {
-            "idx": idx,
-            "question": sample["question"],
-            "prompt": source_prompt,
-            "gt": ground_truth,
-            "unpatched_pred": unpatched_prediction,
-            "patched_pred": None,
-        }
-        results.append(result)
+
         if ground_truth == unpatched_prediction:
             remain_samples.append(sample)
 
@@ -212,25 +208,32 @@ def patchscope_eval(
     for layer_id in range(n_layers):
 
         print("Layer {}".format(layer_id))
-        source_layer_id = layer_id
         correct = 0
 
         for sample in tqdm(remain_samples, total = length):
                
-            source_token_id, target_token_id = sample['source_token_id'], sample['target_token_id']
             hidden_representation = hidden_representations[sample['idx']]
 
             patched_prediction = patch_target_model(
-            target_model, target_tokenizer, target_prompt,
-            source_layer_id, target_layer_id,
-            target_token_id, source_token_id,
+            target_model, target_tokenizer, sample["target_prompt"],
+            layer_id, target_layer_id,
+            sample["target_token_id"], sample["source_token_id"],
             hidden_representation, device
             )
 
             if patched_prediction[0] == sample["gt"][0]:
                 correct += 1
-            if layer_id == n_layers-1:
-                print(patched_prediction, "GT: ", sample['gt'])
+            if layer_id == n_layers - 1:
+                result = {
+                    "idx": sample["idx"],
+                    "question": sample["question"],
+                    "gt": sample["gt"],
+                    "patched_pred": patched_prediction,
+                    "target_prompt": sample["target_prompt"],
+                    "source_id" : sample["source_token_id"],
+                }
+                results.append(result)                
+        print("Accuracy: ", correct/length)
         accuracy.append(correct/length)
 
 

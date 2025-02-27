@@ -1,8 +1,9 @@
 import torch 
 from transformers import AutoModelForCausalLM, AutoTokenizer
 import re
+from typing import Optional
 
-def last_digit_token_id(sentence: str, tokenizer) -> int:
+def last_digit_token_id(sentence: str, tokenizer) -> Optional[int]:
     tokens = tokenizer.tokenize(sentence)
     token_spans = tokenizer(sentence, return_offsets_mapping=True)["offset_mapping"]
 
@@ -20,7 +21,7 @@ def last_digit_token_id(sentence: str, tokenizer) -> int:
 
     return None
 
-def last_word_token_id(sentence: str, tokenizer) -> int:
+def last_word_token_id(sentence: str, tokenizer) -> Optional[int]:
     tokens = tokenizer.tokenize(sentence)
     token_spans = tokenizer(sentence, return_offsets_mapping=True)["offset_mapping"]
 
