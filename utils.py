@@ -33,9 +33,9 @@ def lower_keys(example):
             new_example[key] = value
     return new_example
 
-def get_digit(num):
-    if isinstance(num, int) and 0 <= num <= 99:
-        return len(str(num))
+def get_digit(num: str):
+    if num.isdigit() and 0 <= int(num) <= 99:
+        return len(num)
     return None
 
 def get_examples(prompt_type):
@@ -163,7 +163,7 @@ def get_examples(prompt_type):
 
 
 PROMPT_TEMPLATES = {
-    "direct": ("Question: {input}\nAnswer: ", "{output}", "\n\n"),
+    "direct": ("Question: {input}\nAnswer: ", "{output}", "\n"),
     "cot": ("Question: {input}\nAnswer: ", "{output}", "\n\n\n"),
     "platypus_fs": (
         "### Instruction:\n{input}\n\n### Response:\n",
@@ -208,9 +208,7 @@ def construct_prompt(example, data_name, args):
             ]
         )
     context = input_template.format(input=example["question"])
-    if len(demo_prompt) == 0 or (
-        args.adapt_few_shot and example["gt_ans"] not in ["A", "B", "C", "D", "E"]
-    ):
+    if not demo_prompt:
         full_prompt = context
     else:
         if "qwen" in args.prompt_type:
@@ -231,7 +229,7 @@ def construct_few_shot_prompt(example, data_name, args):
     input_template, output_template, _ = prompt_temp
 
     # Retrieve and limit the number of few-shot examples
-    demos = examples.get(data_name, [])[: args.num_shots]
+    demos = get_examples(prompt_type)[data_name][: args.num_shots]
 
     # Construct the few-shot demonstration part
     demo_prompt = splitter.join(
@@ -245,14 +243,12 @@ def construct_few_shot_prompt(example, data_name, args):
     context = input_template.format(input=example["question"])
 
     # Construct the full prompt
-    if not demo_prompt or (
-        args.adapt_few_shot and example["gt_ans"] not in ["A", "B", "C", "D", "E"]
-    ):
+    if not demo_prompt:
         full_prompt = context
     else:
         full_prompt = demo_prompt + splitter + context
 
-    return full_prompt.strip(" ")
+    return full_prompt.strip(" ") + " "
 
 
 def generate_target_prompt(tokenizer, k=None):
@@ -266,7 +262,7 @@ def generate_target_prompt(tokenizer, k=None):
 
     # Format them into the token identity structure
     token_identity_prompt = "; ".join([f"{tok}->{tok}" for tok in random_tokens])
-    token_identity_prompt += ";"
+    token_identity_prompt += "; "
     return token_identity_prompt
 
 import matplotlib.pyplot as plt

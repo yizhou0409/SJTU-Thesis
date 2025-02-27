@@ -4,6 +4,7 @@ import argparse
 import time
 import torch
 import json
+import gc
 
 from tqdm import tqdm
 
@@ -19,14 +20,14 @@ from evaluate import evaluate
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--data_names", default="gsm8k,math", type=str)
+    parser.add_argument("--data_names", default="gsm8k", type=str)
     parser.add_argument("--data_dir", default="./data", type=str)
     parser.add_argument("--source_model_name", default="Qwen/Qwen2.5-Math-1.5B-Instruct", type=str)
     parser.add_argument("--target_model_name", default="Qwen/Qwen2.5-1.5B", type=str)
     parser.add_argument("--eval", action="store_false")
-    parser.add_argument("--eval_source_token", default="last_digit", type=int)
+    parser.add_argument("--eval_source_token", default="last_digit", type=str)
     parser.add_argument("--source_layer_id", default=-2, type=int)
-    parser.add_argument("--target_layer_id", default=-1, type=int)
+    parser.add_argument("--target_layer_id", default=-2, type=int)
     parser.add_argument("--source_token_id", default=-1, type=int)
     parser.add_argument("--target_token_id", default=-1, type=int)
     parser.add_argument("--output_dir", default="./output", type=str)
@@ -74,11 +75,16 @@ def setup(args):
     data_list = args.data_names.split(",")
 
     if args.eval:
+        print("Mode: Eval")
         for data_name in data_list:
+            torch.cuda.empty_cache()  # Clear memory before processing a new dataset
+            gc.collect()  # Force garbage collection
             main_eval(source_model, target_model, source_tokenizer, target_tokenizer, data_name, args, device)
     else:
         results = []
         for data_name in data_list:
+            torch.cuda.empty_cache()  # Clear memory before processing a new dataset
+            gc.collect()  # Force garbage collection
             results.append(main(source_model, target_model, source_tokenizer, target_tokenizer, data_name, args, device))
 
         # add "avg" result to data_list and results
@@ -136,8 +142,8 @@ def main(source_model, target_model, source_tokenizer, target_tokenizer, data_na
                         device, 
                         source_layer_id,
                         target_layer_id,
-                        source_token_position,
-                        target_token_position)
+                        args.source_token_id,
+                        args.target_token_id)
 
     with open(out_file, "w") as f:
         json.dump(outputs, f, indent=4)
@@ -198,7 +204,7 @@ def main_eval(source_model, target_model, source_tokenizer, target_tokenizer, da
                         args)
     
     with open(out_file, "w") as f:
-        json.dump(outputs, f, indent=4)
+        json.dump(results, f, indent=4)
 
     result_json = evaluate(results)
     time_use = time.time() - start_time   
@@ -208,7 +214,7 @@ def main_eval(source_model, target_model, source_tokenizer, target_tokenizer, da
     with open(out_file.replace(".jsonl", f"_{args.prompt_type}_metrics.json"), "w") as f:
         json.dump(result_json, f, indent=4)
     
-    file_dir = out_file.replace(".jsonl", f"_{resulrs[accuracy_unpatched]}_accuracy_curve.png")
+    file_dir = out_file.replace(".jsonl", f"_{result_json['accuracy_unpatched']}_accuracy_curve.png")
     plot_accuracy_curve(accuracy, file_dir)
 
     

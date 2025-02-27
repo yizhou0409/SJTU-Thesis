@@ -4,7 +4,7 @@ from utils import *
 from tqdm import tqdm
 import argparse
 
-# Get h_l^i in the execution of source model M on input sequence S
+#  h_l^i in the execution of source model M on input sequence S
 def get_hidden_representation(source_model, source_tokenizer, prompt, n_tokens, device) -> torch.Tensor:
     """ Get the residual stream activations of the source model for the input prompt.
     
@@ -31,7 +31,8 @@ def get_hidden_representation(source_model, source_tokenizer, prompt, n_tokens, 
 
             if _ == 0:  # Store hidden representation only for the first token
                 hidden_representation = hidden_representation.clone()
-
+                for h in hooks:
+                    h.remove()
             predicted_token_id = torch.argmax(logits[:, -1, :], dim=-1)
             predicted_text += source_tokenizer.decode(predicted_token_id, skip_special_tokens=True)
             
@@ -53,25 +54,25 @@ def patch_target_model(
                         target_prompt,
                         source_layer_id: int,
                         target_layer_id: int,
-                        target_token_position: int,
-                        source_token_position: int,
+                        target_token_id: int,
+                        source_token_id: int,
                         hidden_representation: torch.Tensor,
                         device
 ) -> torch.Tensor:
 
     def patching_handler(source_layer_id: int,
-                            target_token_position: int,
-                            source_token_position: int):
+                            target_token_id: int,
+                            source_token_id: int):
         def patching_hook(module, input, output):
-            output[0][:, target_token_position, :] = hidden_representation[:, source_token_position, source_layer_id, :]
+            output[0][:, target_token_id, :] = hidden_representation[:, source_token_id, source_layer_id, :]
             return output
         return patching_hook
 
     layers, n_layers = get_layers_to_enumerate(target_model)
     hook_handle = layers[target_layer_id].register_forward_hook(
         patching_handler(source_layer_id=source_layer_id, 
-                            target_token_position=target_token_position,
-                            source_token_position=source_token_position)
+                            target_token_id=target_token_id,
+                            source_token_id=source_token_id)
     ) 
 
     try:
@@ -101,8 +102,8 @@ def patchscope(
         device, 
         source_layer_id, 
         target_layer_id, 
-        target_token_position, 
-        source_token_position
+        target_token_id, 
+        source_token_id
 ):
     """
     Operates patchscope on given samples:
@@ -118,8 +119,8 @@ def patchscope(
     - device: The computation device (CPU/GPU).
     - source_layer_id: The layer index from which to extract the hidden representation.
     - target_layer_id: The layer index in the target model where patching is applied.
-    - target_token_position: Token index in the target model where the patching is applied.
-    - source_token_position: Token index in the source model where the hidden state is extracted.
+    - target_token_id: Token index in the target model where the patching is applied.
+    - source_token_id: Token index in the source model where the hidden state is extracted.
     
     Returns:
     - results: A list containing results for each sample.
@@ -140,7 +141,7 @@ def patchscope(
         patched_prediction = patch_target_model(
             target_model, target_tokenizer, target_prompt,
             source_layer_id, target_layer_id,
-            target_token_position, source_token_position,
+            target_token_id, source_token_id,
             hidden_representation, device
         )
 
@@ -179,36 +180,30 @@ def patchscope_eval(
             source_model, source_tokenizer, source_prompt, n_digits, device
         )
         hidden_representations[idx] = hidden_representation
-        # Step 2: If correct, apply patching and check the new prediction
-        patched_prediction = patch_target_model(
-            target_model, target_tokenizer, target_prompt,
-            source_layer_id, target_layer_id,
-            target_token_position, source_token_position,
-            hidden_representation, device
-        )
 
-        source_token_position = 0
-        target_token_position = args.target_token_position
+        source_token_id = 0
+        target_token_id = args.target_token_id
         if args.eval_source_token=="last_digit":
-            source_token_position = get_digit_token_position(source_prompt, source_tokenizer)
+            source_token_id = last_digit_token_id(source_prompt, source_tokenizer)
         elif args.eval_source_token=="last_word":
-            source_token_position = get_word_token_position(source_prompt, source_tokenizer)
-        sample["source_token_position"] = source_token_position
-        sample["target_token_position"] = target_token_position
-
-        results.append({
+            source_token_id = last_word_token_id(source_prompt, source_tokenizer)
+        sample["source_token_id"] = source_token_id
+        sample["target_token_id"] = target_token_id
+        result = {
             "idx": idx,
             "question": sample["question"],
+            "prompt": source_prompt,
             "gt": ground_truth,
             "unpatched_pred": unpatched_prediction,
             "patched_pred": None,
-        })
+        }
+        results.append(result)
         if ground_truth == unpatched_prediction:
             remain_samples.append(sample)
 
 
     print("Now working on each layers:")
-    _, n_layers = get_layers_to_enumerate()
+    _, n_layers = get_layers_to_enumerate(source_model)
 
     target_layer_id = args.target_layer_id
 
@@ -222,40 +217,25 @@ def patchscope_eval(
 
         for sample in tqdm(remain_samples, total = length):
                
-            source_token_position, target_token_position = sample['source_token_position'], sample['target_token_position']
+            source_token_id, target_token_id = sample['source_token_id'], sample['target_token_id']
             hidden_representation = hidden_representations[sample['idx']]
 
             patched_prediction = patch_target_model(
             target_model, target_tokenizer, target_prompt,
             source_layer_id, target_layer_id,
-            target_token_position, source_token_position,
+            target_token_id, source_token_id,
             hidden_representation, device
             )
 
-            if patched_prediction == sample["gt"][0]:
+            if patched_prediction[0] == sample["gt"][0]:
                 correct += 1
+            if layer_id == n_layers-1:
+                print(patched_prediction, "GT: ", sample['gt'])
         accuracy.append(correct/length)
 
 
     return results, accuracy
 
-def generate_few_shot_prompt(few_shot_examples, new_question):
-    """
-    Generates a few-shot prompt given example question-answer pairs and a new question.
-    
-    Args:
-        few_shot_examples (list of dict): List of {"question": str, "answer": str} pairs.
-        new_question (str): The new question for which the model should generate an answer.
-    
-    Returns:
-        str: A formatted few-shot prompt.
-    """
-    pre_prompt = "Just answer next question in the following format: \n"
-    formatted_examples = "\n".join(
-        [f"Q: {ex['question']}\nA: {ex['answer']}" for ex in few_shot_examples]
-    )
-    prompt = pre_prompt + f" {formatted_examples}\nQ: {new_question}\nA: "
-    return prompt
 
 if __name__=="__main__":
      # Load model and tokenizer

@@ -2,16 +2,16 @@ import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 import re
 
-def last_digit_token_position(sentence: str, tokenizer) -> int:
+def last_digit_token_id(sentence: str, tokenizer) -> int:
     tokens = tokenizer.tokenize(sentence)
     token_spans = tokenizer(sentence, return_offsets_mapping=True)["offset_mapping"]
 
-    # Find all digits and their character positions in the original sentence
-    digit_positions = [m.start() for m in re.finditer(r'\d', sentence)]
-    if not digit_positions:
+    # Find all digits and their character ids in the original sentence
+    digit_ids = [m.start() for m in re.finditer(r'\d', sentence)]
+    if not digit_ids:
         return None
 
-    last_digit_pos = digit_positions[-1]  # Position of the last digit in the original sentence
+    last_digit_pos = digit_ids[-1]  # id of the last digit in the original sentence
 
     # Find the corresponding token index
     for i, (start, end) in enumerate(token_spans):
@@ -20,16 +20,16 @@ def last_digit_token_position(sentence: str, tokenizer) -> int:
 
     return None
 
-def last_word_token_position(sentence: str, tokenizer) -> int:
+def last_word_token_id(sentence: str, tokenizer) -> int:
     tokens = tokenizer.tokenize(sentence)
     token_spans = tokenizer(sentence, return_offsets_mapping=True)["offset_mapping"]
 
-    # Find all words (alphanumeric sequences) and their positions
+    # Find all words (alphanumeric sequences) and their ids
     word_matches = list(re.finditer(r'\b\w+\b', sentence))
     if not word_matches:
         return None
 
-    last_word_pos = word_matches[-1].start()  # Position of the last word in the original sentence
+    last_word_pos = word_matches[-1].start()  # id of the last word in the original sentence
 
     # Find the corresponding token index
     for i, (start, end) in enumerate(token_spans):
