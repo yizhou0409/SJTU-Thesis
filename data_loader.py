@@ -54,7 +54,7 @@ def prepare_data(data_name, args):
     # shuffle
     if args.shuffle:
         random.seed(datetime.now().timestamp())
-        random.shuffle(examples
+        random.shuffle(examples)
 
     # select start and end
     examples = examples[args.start : len(examples) if args.end == -1 else args.end]
