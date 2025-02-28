@@ -329,7 +329,7 @@ def plot_surprisal_curve(accuracy, file_dir=None):
     layers = list(range(len(accuracy)))  # x-axis: layer indices
 
     plt.figure(figsize=(8, 5))
-    plt.plot(layers, accuracy, marker='o', linestyle='-', color='b', markersize=6, linewidth=2, label="Accuracy")
+    plt.plot(layers, accuracy, marker='o', linestyle='-', color='b', markersize=6, linewidth=2, label="Surprisal")
 
     # Beautify the plot
     plt.xlabel("Layer Index", fontsize=12)

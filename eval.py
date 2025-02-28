@@ -22,7 +22,7 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--data_names", default="gsm8k,math", type=str)
     parser.add_argument("--data_dir", default="./data", type=str)
-    parser.add_argument("--source_model_name", default="Qwen/Qwen2.5-Math-7B-Instruct", type=str)
+    parser.add_argument("--source_model_name", default="Qwen/Qwen2.5-Math-1.5B-Instruct", type=str)
     parser.add_argument("--target_model_name", default="same", type=str) # same or specify a model name
     parser.add_argument("--eval", action="store_false")
     parser.add_argument("--eval_source_token", default="use_arg", type=str) #last_word, last_digit, last, use_arg
@@ -207,8 +207,8 @@ def main_eval(source_model, target_model, source_tokenizer, target_tokenizer, da
     with open(out_file, "w") as f:
         json.dump(results, f, indent=4)
     
-    accuracy_file_dir = out_file.replace(".jsonl", f"_{args.eval_source_token}_accuracy_curve.png")
-    surprisal_file_dir = out_file.replace(".jsonl", f"_{args.eval_source_token}_surprisal_curve.png")
+    accuracy_file_dir = out_file.replace(".jsonl", f"{args.source_token_id}_{args.eval_source_token}_accuracy_curve.png")
+    surprisal_file_dir = out_file.replace(".jsonl", f"{args.source_token_id}_{args.eval_source_token}_surprisal_curve.png")
     plot_accuracy_curve(accuracy, accuracy_file_dir)
     plot_surprisal_curve(surprisal, surprisal_file_dir)
     

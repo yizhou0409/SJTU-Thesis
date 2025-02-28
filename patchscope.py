@@ -220,7 +220,7 @@ def patchscope_eval(
             hidden_representation, device
             )
 
-            patched_surprisal = compute_surprisal(last_token_logits, target_tokenizer.encode(patched_prediction)[0])
+            patched_surprisal = compute_surprisal(last_token_logits, target_tokenizer.encode(sample["gt"][0]))
             surprise += patched_surprisal
 
             if patched_prediction[0] == sample["gt"][0]:
