@@ -1,4 +1,5 @@
 import torch 
+import torch.nn.functional as F
 import random
 import numpy as np
 import os
@@ -156,31 +157,25 @@ def get_examples(prompt_type):
 
         examples["math"] = [
             (
-                "Kevin Kangaroo begins hopping on a number line at 0. He wants to get to 1, but he can hop only $\\frac{1}{3}$ of the distance. Each hop tires him out so that he continues to hop $\\frac{1}{3}$ of the remaining distance. How far has he hopped after five hops? Express your answer as a common fraction.",
-                "Let's think step by step\nKevin hops $1/3$ of the remaining distance with every hop.\nHis first hop takes $1/3$ closer.\nFor his second hop, he has $2/3$ left to travel, so he hops forward $(2/3)(1/3)$.\nFor his third hop, he has $(2/3)^2$ left to travel, so he hops forward $(2/3)^2(1/3)$.\nIn general, Kevin hops forward $(2/3)^{k-1}(1/3)$ on his $k$th hop.\nWe want to find how far he has hopped after five hops.\nThis is a finite geometric series with first term $1/3$, common ratio $2/3$, and five terms.\nThus, Kevin has hopped $\\frac{\\frac{1}{3}\\left(1-\\left(\\frac{2}{3}\\right)^5\\right)}{1-\\frac{2}{3}} = \\boxed{\\frac{211}{243}}$.\nThe answer is \\frac{211}{243}}",
-            ),
-            (
-                "What is the area of the region defined by the equation $x^2+y^2 - 7 = 4y-14x+3$?",
-                "Let's think step by step\nWe rewrite the equation as $x^2 + 14x + y^2 - 4y = 10$ and then complete the square,\nresulting in  $(x+7)^2-49 + (y-2)^2-4=10$,\nor $(x+7)^2+(y-2)^2=63$.\nThis is the equation of a circle with center $(-7, 2)$ and radius $\\sqrt{63},$\nso the area of this region is $\\pi r^2 = \\boxed{63\\pi}$.\nThe answer is 63\\pi",
-            ),
-            (
-                "If $x^2+y^2=1$, what is the largest possible value of $|x|+|y|$?",
-                "Let's think step by step\nIf $(x,y)$ lies on the circle,\nso does $(x,-y),$ $(-x,-y),$ and $(-x,-y),$ (which all give the same value of $|x| + |y|$),\nso we can assume that $x \\ge 0$ and $y \\ge 0.$\nThen $|x| + |y| = x + y.$  Squaring, we get\n\\[(x + y)^2 = x^2 + 2xy + y^2 = 1 + 2xy.\\]\nNote that $(x - y)^2 \\ge 0.$\nExpanding, we get $x^2 - 2xy + y^2 \\ge 0,$ so $2xy \\le x^2 + y^2 = 1.$\nHence,\\[1 + 2xy \\le 2,\\]which means $x + y \\le \\sqrt{2}.$\nEquality occurs when $x = y = \\frac{1}{\\sqrt{2}},$\nso the maximum value of $|x| + |y|$ is $\\boxed{\\sqrt{2}}.$\nThe answer is \\sqrt{2}",
-            ),
-            (
                 "If $f(x)=\\frac{ax+b}{cx+d}, abcd\\not=0$ and $f(f(x))=x$ for all $x$ in the domain of $f$, what is the value of $a+d$?",
-                "Let's think step by step\nThe condition $f(f(x))$ means that $f$ is the inverse of itself,\nso its graph is symmetrical about the line $y = x$.\nWith a rational function of this form, we will have two asymptotes:\na vertical one at $x=-d/c$ if $cx+d$ does not divide $ax+b$,\nand a horizontal one at $y=a/c$,\nif we take the limit of $f(x)$ as $x$ goes to $\\pm\\infty$.\nIn order for $f$ to be its own inverse, the intersection of the asymptotes must lie on the line $y=x$\nso that it and its asymptotes reflect onto themselves.\nThis means that $-d/c=a/c$,\nand therefore $-d=a$ and $a+d=\\boxed{0}$.\nThe answer is 0",
+                "0",
             ),
-            (
-                "Expand $(2z^2 + 5z - 6)(3z^3 - 2z + 1)$.",
-                "Let's think step by step\n$$\\begin{array}{crrrrrrr}\n& & & 3z^3 & & -2z & + 1 & \\\\\n\\times & & & & 2z^2 & +5z & -6 \\\\\n\\cline{1-7}\\rule{0pt}{0.17in}\n& & & -18z^3 & & +12z & -6 & \\\\\n& & +15z^4 & & -10z^2 & +5z & & \\\\\n+ & 6z^5 & & -4z^3 & +2z^2 & & & \\\\\n\\cline{1-7}\\rule{0pt}{0.17in}\n& 6z^5 & +15z^4 & -22z^3 & - 8z^2 &+17z & -6 &\n\\end{array}$$\nThe answer is 6z^5+15z^4-22z^3-8z^2+17z-6",
-            ),
+
         ]
 
 
 
     return examples
 
+def extract_model_name(model_str: str) -> str:
+    match = re.search(r'[^/]+/([^/]+)$', model_str)
+    return match.group(1) if match else model_str
+
+def compute_surprisal(logits, token_id):
+    probabilities = F.softmax(logits, dim=-1)
+    token_prob = probabilities[:, token_id]
+    surprisal = -torch.log(token_prob)
+    return surprisal.item()
 
 PROMPT_TEMPLATES = {
     "direct": ("Question: {input}\nAnswer: ", "{output}", "\n"),
@@ -307,6 +302,39 @@ def plot_accuracy_curve(accuracy, file_dir=None):
     plt.xlabel("Layer Index", fontsize=12)
     plt.ylabel("Accuracy", fontsize=12)
     plt.title("Accuracy Curve Across Layers", fontsize=14, fontweight='bold')
+    plt.xticks(fontsize=10)
+    plt.yticks(fontsize=10)
+    plt.grid(True, linestyle="--", alpha=0.6)
+    plt.legend(fontsize=12)
+    plt.tight_layout()
+
+    if file_dir:
+        os.makedirs(os.path.dirname(file_dir), exist_ok=True)  # Ensure the directory exists
+        plt.savefig(file_dir, dpi=300, bbox_inches='tight')  # Save with high resolution
+        print(f"Figure saved to {file_dir}")
+    # Show the plot
+    plt.show()
+
+def plot_surprisal_curve(accuracy, file_dir=None):
+    """
+    Plots the accuracy curve across different layers.
+
+    Parameters:
+        accuracy (list): A list of accuracy values corresponding to each layer.
+        n_layers (int): The total number of layers.
+
+    Returns:
+        None
+    """
+    layers = list(range(len(accuracy)))  # x-axis: layer indices
+
+    plt.figure(figsize=(8, 5))
+    plt.plot(layers, accuracy, marker='o', linestyle='-', color='b', markersize=6, linewidth=2, label="Accuracy")
+
+    # Beautify the plot
+    plt.xlabel("Layer Index", fontsize=12)
+    plt.ylabel("Surprisal", fontsize=12)
+    plt.title("Surprisal Curve Across Layers", fontsize=14, fontweight='bold')
     plt.xticks(fontsize=10)
     plt.yticks(fontsize=10)
     plt.grid(True, linestyle="--", alpha=0.6)

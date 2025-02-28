@@ -3,7 +3,7 @@ import json
 import random
 import datasets
 from datasets import load_dataset, Dataset, concatenate_datasets
-from utils import lower_keys, load_jsonl
+from utils import lower_keys, load_jsonl, extract_model_name
 from datetime import datetime
 
 def load_data(data_name, split, data_dir="./data"):
@@ -54,7 +54,7 @@ def prepare_data(data_name, args):
     # shuffle
     if args.shuffle:
         random.seed(datetime.now().timestamp())
-        random.shuffle(examples)
+        random.shuffle(examples
 
     # select start and end
     examples = examples[args.start : len(examples) if args.end == -1 else args.end]
@@ -65,7 +65,7 @@ def prepare_data(data_name, args):
     output_dir = args.output_dir
     if not os.path.exists(output_dir):
         output_dir = f"outputs/{output_dir}"
-    out_file = f"{output_dir}/{data_name}/{out_file_prefix}_s{args.start}_e{args.end}.jsonl"
+    out_file = f"{output_dir}/{data_name}/{out_file_prefix}_s{args.start}_e{args.end}_{extract_model_name(args.source_model_name)}_{args.target_layer_id}.jsonl"
     os.makedirs(f"{output_dir}/{data_name}", exist_ok=True)
     return examples, [], out_file
 

@@ -90,7 +90,7 @@ def patch_target_model(
     finally:
         hook_handle.remove()
     
-    return predicted_token
+    return predicted_token, last_token_logits
 
 
 def patchscope(
@@ -138,7 +138,7 @@ def patchscope(
         )
 
         # Step 2: If correct, apply patching and check the new prediction
-        patched_prediction = patch_target_model(
+        patched_prediction, _ = patch_target_model(
             target_model, target_tokenizer, target_prompt,
             source_layer_id, target_layer_id,
             target_token_id, source_token_id,
@@ -172,14 +172,13 @@ def patchscope_eval(
     for sample in tqdm(samples, total=len(samples)):
         idx = sample["idx"]
         source_prompt = sample["source_prompt"]
-        target_prompt = sample["target_prompt"]
         ground_truth = sample["gt"]
         n_digits = get_digit(ground_truth)
         # Get hidden representation and unpatched prediction in a single pass
         hidden_representation, unpatched_prediction = get_hidden_representation(
             source_model, source_tokenizer, source_prompt, n_digits, device
         )
-        hidden_representations[idx] = hidden_representation
+        hidden_representations[idx] = hidden_representation.cpu()
 
         source_token_id = 0
         target_token_id = args.target_token_id
@@ -204,22 +203,25 @@ def patchscope_eval(
     target_layer_id = args.target_layer_id
 
     accuracy = []
+    surprisal = []
     length = len(remain_samples)
     for layer_id in range(n_layers):
 
         print("Layer {}".format(layer_id))
         correct = 0
-
+        surprise = 0
         for sample in tqdm(remain_samples, total = length):
                
-            hidden_representation = hidden_representations[sample['idx']]
-
-            patched_prediction = patch_target_model(
+            hidden_representation = hidden_representations[sample['idx']].to(device)
+            patched_prediction, last_token_logits = patch_target_model(
             target_model, target_tokenizer, sample["target_prompt"],
             layer_id, target_layer_id,
             sample["target_token_id"], sample["source_token_id"],
             hidden_representation, device
             )
+
+            patched_surprisal = compute_surprisal(last_token_logits, target_tokenizer.encode(patched_prediction)[0])
+            surprise += patched_surprisal
 
             if patched_prediction[0] == sample["gt"][0]:
                 correct += 1
@@ -231,13 +233,15 @@ def patchscope_eval(
                     "patched_pred": patched_prediction,
                     "target_prompt": sample["target_prompt"],
                     "source_id" : sample["source_token_id"],
+                    "surprisal" : patched_surprisal
                 }
                 results.append(result)                
-        print("Accuracy: ", correct/length)
+        print("Accuracy: ", correct/length, "Surprisal: ", surprise/length)
+        surprisal.append(surprise/length)
         accuracy.append(correct/length)
 
 
-    return results, accuracy
+    return results, accuracy, surprisal
 
 
 if __name__=="__main__":

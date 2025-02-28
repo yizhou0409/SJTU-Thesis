@@ -20,15 +20,15 @@ from evaluate import evaluate
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--data_names", default="gsm8k", type=str)
+    parser.add_argument("--data_names", default="gsm8k,math", type=str)
     parser.add_argument("--data_dir", default="./data", type=str)
-    parser.add_argument("--source_model_name", default="Qwen/Qwen2.5-Math-1.5B-Instruct", type=str)
-    parser.add_argument("--target_model_name", default="Qwen/Qwen2.5-Math-1.5B-Instruct", type=str)
+    parser.add_argument("--source_model_name", default="Qwen/Qwen2.5-Math-7B-Instruct", type=str)
+    parser.add_argument("--target_model_name", default="same", type=str) # same or specify a model name
     parser.add_argument("--eval", action="store_false")
     parser.add_argument("--eval_source_token", default="use_arg", type=str) #last_word, last_digit, last, use_arg
     parser.add_argument("--source_layer_id", default=-2, type=int)
     parser.add_argument("--target_layer_id", default=-1, type=int)
-    parser.add_argument("--source_token_id", default=-2, type=int)
+    parser.add_argument("--source_token_id", default=-1, type=int)
     parser.add_argument("--target_token_id", default=-1, type=int)
     parser.add_argument("--output_dir", default="./output", type=str)
     parser.add_argument("--prompt_type", default="direct", type=str)
@@ -60,12 +60,13 @@ def setup(args):
         load_in_half=True,
         use_safetensors=args.use_safetensors,
     )
-
-    target_model, target_tokenizer = load_model_and_tokenizer(
-        model_name=args.target_model_name,
-        load_in_half=True,
-        use_safetensors=args.use_safetensors,
-    )    
+    target_model, target_tokenizer = source_model, source_tokenizer
+    if args.target_model_name != 'same':
+        target_model, target_tokenizer = load_model_and_tokenizer(
+            model_name=args.target_model_name,
+            load_in_half=True,
+            use_safetensors=args.use_safetensors,
+        )    
 
     if torch.cuda.device_count() > 1:
         print(f"Using {torch.cuda.device_count()} GPUs!")
@@ -195,20 +196,21 @@ def main_eval(source_model, target_model, source_tokenizer, target_tokenizer, da
             }
             samples.append(sample)
         
-    results, accuracy = patchscope_eval(samples, 
-                        source_model, 
-                        source_tokenizer, 
-                        target_model, 
-                        target_tokenizer, 
-                        device, 
-                        args)
+    results, accuracy, surprisal = patchscope_eval(samples, 
+                                                source_model, 
+                                                source_tokenizer, 
+                                                target_model, 
+                                                target_tokenizer, 
+                                                device, 
+                                                args)
     
     with open(out_file, "w") as f:
         json.dump(results, f, indent=4)
     
-    file_dir = out_file.replace(".jsonl", f"_{args.eval_source_token}_accuracy_curve.png")
-    plot_accuracy_curve(accuracy, file_dir)
-
+    accuracy_file_dir = out_file.replace(".jsonl", f"_{args.eval_source_token}_accuracy_curve.png")
+    surprisal_file_dir = out_file.replace(".jsonl", f"_{args.eval_source_token}_surprisal_curve.png")
+    plot_accuracy_curve(accuracy, accuracy_file_dir)
+    plot_surprisal_curve(surprisal, surprisal_file_dir)
     
 if __name__ == "__main__":
     args = parse_args()
