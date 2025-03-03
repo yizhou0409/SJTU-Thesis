@@ -22,14 +22,15 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--data_names", default="gsm8k,math", type=str)
     parser.add_argument("--data_dir", default="./data", type=str)
-    parser.add_argument("--source_model_name", default="Qwen/Qwen2.5-Math-1.5B-Instruct", type=str)
+    parser.add_argument("--source_model_name", default="Qwen/Qwen2.5-Math-7B-Instruct", type=str)
     parser.add_argument("--target_model_name", default="same", type=str) # same or specify a model name
     parser.add_argument("--eval", action="store_false")
     parser.add_argument("--eval_source_token", default="use_arg", type=str) #last_word, last_digit, last, use_arg
-    parser.add_argument("--source_layer_id", default=-2, type=int)
+    parser.add_argument("--eval_target_layer", default="same", type=str) #use_arg, same
+    parser.add_argument("--source_layer_id", default=-1, type=int)
     parser.add_argument("--target_layer_id", default=-1, type=int)
-    parser.add_argument("--source_token_id", default=-1, type=int)
-    parser.add_argument("--target_token_id", default=-1, type=int)
+    parser.add_argument("--source_token_id", default=-2, type=int)
+    parser.add_argument("--target_token_id", default=-2, type=int)
     parser.add_argument("--output_dir", default="./output", type=str)
     parser.add_argument("--prompt_type", default="direct", type=str)
     parser.add_argument("--num_shots", default=1, type=int)

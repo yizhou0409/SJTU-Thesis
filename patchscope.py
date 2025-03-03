@@ -206,8 +206,9 @@ def patchscope_eval(
     surprisal = []
     length = len(remain_samples)
     for layer_id in range(n_layers):
-
-        print("Layer {}".format(layer_id))
+        if args.eval_target_layer == 'same':
+            target_layer_id = layer_id
+        print("Layer {}".format(layer_id), "Target_layer {}".format(target_layer_id))
         correct = 0
         surprise = 0
         for sample in tqdm(remain_samples, total = length):

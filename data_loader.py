@@ -61,11 +61,11 @@ def prepare_data(data_name, args):
 
     # get out_file name
     dt_string = datetime.now().strftime("%m-%d_%H-%M")
-    out_file_prefix = f"{args.split}_{args.prompt_type}_{args.num_test_sample}_seed{args.seed}_t{args.temperature}"
+    out_file_prefix = f"{args.prompt_type}_seed{args.seed}"
     output_dir = args.output_dir
     if not os.path.exists(output_dir):
         output_dir = f"outputs/{output_dir}"
-    out_file = f"{output_dir}/{data_name}/{out_file_prefix}_s{args.start}_e{args.end}_{extract_model_name(args.source_model_name)}_{args.target_layer_id}.jsonl"
+    out_file = f"{output_dir}/{data_name}/{out_file_prefix}__{extract_model_name(args.source_model_name)}_sourcetoken{args.eval_source_token}{args.source_token_id}__tt{args.target_token_id}_targetlayer{args.eval_target_layer}{args.target_layer_id}.jsonl"
     os.makedirs(f"{output_dir}/{data_name}", exist_ok=True)
     return examples, [], out_file
 

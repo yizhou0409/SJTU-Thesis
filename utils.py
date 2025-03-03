@@ -174,7 +174,7 @@ def extract_model_name(model_str: str) -> str:
 def compute_surprisal(logits, token_id):
     probabilities = F.softmax(logits, dim=-1)
     token_prob = probabilities[:, token_id]
-    surprisal = -torch.log(token_prob)
+    surprisal = -torch.log(token_prob+1e-20)
     return surprisal.item()
 
 PROMPT_TEMPLATES = {
