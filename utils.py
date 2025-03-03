@@ -171,6 +171,19 @@ def extract_model_name(model_str: str) -> str:
     match = re.search(r'[^/]+/([^/]+)$', model_str)
     return match.group(1) if match else model_str
 
+def get_result_from_box(text: str) -> str:
+    """
+    Extracts the content inside \boxed{} from a given text.
+
+    Args:
+        text (str): The input text containing \boxed{result}.
+
+    Returns:
+        str: The extracted result, or an empty string if no match is found.
+    """
+    match = re.search(r'\\boxed{([^}]*)}', text)
+    return match.group(1) if match else ""
+    
 def compute_surprisal(logits, token_id):
     probabilities = F.softmax(logits, dim=-1)
     token_prob = probabilities[:, token_id]

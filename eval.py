@@ -22,15 +22,15 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--data_names", default="gsm8k,math", type=str)
     parser.add_argument("--data_dir", default="./data", type=str)
-    parser.add_argument("--source_model_name", default="Qwen/Qwen2.5-Math-7B-Instruct", type=str)
+    parser.add_argument("--source_model_name", default="Qwen/Qwen2.5-Math-1.5B-Instruct", type=str)
     parser.add_argument("--target_model_name", default="same", type=str) # same or specify a model name
     parser.add_argument("--eval", action="store_false")
     parser.add_argument("--eval_source_token", default="use_arg", type=str) #last_word, last_digit, last, use_arg
     parser.add_argument("--eval_target_layer", default="same", type=str) #use_arg, same
     parser.add_argument("--source_layer_id", default=-1, type=int)
     parser.add_argument("--target_layer_id", default=-1, type=int)
-    parser.add_argument("--source_token_id", default=-2, type=int)
-    parser.add_argument("--target_token_id", default=-2, type=int)
+    parser.add_argument("--source_token_id", default=-1, type=int)
+    parser.add_argument("--target_token_id", default=-1, type=int)
     parser.add_argument("--output_dir", default="./output", type=str)
     parser.add_argument("--prompt_type", default="direct", type=str)
     parser.add_argument("--num_shots", default=1, type=int)
@@ -160,59 +160,6 @@ def main(source_model, target_model, source_tokenizer, target_tokenizer, data_na
 
     return result_json
 
-def main_eval(source_model, target_model, source_tokenizer, target_tokenizer, data_name, args, device):
-    start_time = time.time()
-    examples, processed_samples, out_file = prepare_data(data_name, args)
-    print("=" * 50)
-    print("data:", data_name, ", remain samples:", len(examples))
-    if len(examples) > 0:
-        print(examples[0])
-
-    samples = []
-    for example in tqdm(examples, total=len(examples)):
-        idx = example["idx"]
-        example["question"] = parse_question(example, data_name)
-        if example["question"] == "":
-            continue
-        gt_ans = parse_ground_truth(example, data_name)
-        example["gt_ans"] = gt_ans
-
-        source_full_prompt = ""
-        if args.num_shots>0:
-            source_full_prompt = construct_few_shot_prompt(example, data_name, args)
-        else:
-            souce_full_prompt = construct_prompt(example, data_name, args)
-        target_full_prompt = generate_target_prompt(target_tokenizer)
-        
-        if idx == args.start:
-            print(source_full_prompt)
-
-        if get_digit(gt_ans):
-            sample = {
-                "idx": idx,
-                "question": example["question"],
-                "gt": gt_ans,
-                "source_prompt": source_full_prompt,
-                "target_prompt": target_full_prompt
-            }
-            samples.append(sample)
-        
-    results, accuracy, surprisal = patchscope_eval(samples, 
-                                                source_model, 
-                                                source_tokenizer, 
-                                                target_model, 
-                                                target_tokenizer, 
-                                                device, 
-                                                args)
-    
-    with open(out_file, "w") as f:
-        json.dump(results, f, indent=4)
-    
-    accuracy_file_dir = out_file.replace(".jsonl", f"{args.source_token_id}_{args.eval_source_token}_accuracy_curve.png")
-    surprisal_file_dir = out_file.replace(".jsonl", f"{args.source_token_id}_{args.eval_source_token}_surprisal_curve.png")
-    plot_accuracy_curve(accuracy, accuracy_file_dir)
-    plot_surprisal_curve(surprisal, surprisal_file_dir)
-    
 if __name__ == "__main__":
     args = parse_args()
     set_seed(args.seed)
