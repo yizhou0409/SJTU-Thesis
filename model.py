@@ -39,32 +39,6 @@ def last_word_token_id(sentence: str, tokenizer) -> Optional[int]:
 
     return None
 
-def generate_response(model, tokenizer, prompt, max_length=512):
-    inputs = tokenizer(prompt, return_tensors="pt").to(device)
-    
-    with torch.no_grad():
-        outputs = model.generate(**inputs, max_length=max_length)
-    
-    predicted_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
-
-    return predicted_text
-
-def predict_next_token(model, tokenizer, prompt, max_length=512):
-    inputs = tokenizer(prompt, return_tensors="pt").to(device)
-
-
-    with torch.no_grad():
-        outputs = model(**inputs)
-        logits = outputs.logits  # (batch_size, seq_length, vocab_size)
-
-    last_token_logits = logits[:, -1, :]  # Get last token logits
-
-    predicted_token_id = torch.argmax(last_token_logits, dim=-1)  # Most probable token
-    predicted_text = tokenizer.decode(predicted_token_id, skip_special_tokens=True)
-
-    return predicted_text
-
-
 def load_model_and_tokenizer(
         model_name, 
         tokenizer_name=None, 

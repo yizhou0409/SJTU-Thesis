@@ -14,7 +14,6 @@ def get_hidden_representation(source_model, source_tokenizer, prompt, n_tokens, 
     Returns:
     hidden_representation: torch.Tensor [batch_size, seq_len, n_layers, hidden_size]
     """
-
     input_ids = source_tokenizer(prompt, return_tensors='pt', truncation=True).to(device)
     layers, n_layers = get_layers_to_enumerate(source_model)
     hidden_representation = torch.zeros((input_ids['input_ids'].shape[0], input_ids['input_ids'].shape[1], n_layers, source_model.config.hidden_size))
@@ -57,30 +56,32 @@ def get_hidden_representation_cot_eval(source_model, source_tokenizer, prompt, d
         return hook_fn
     
     hooks = [layer.register_forward_hook(store_source_activations(layer_id)) for layer_id, layer in enumerate(layers)]
-
+    first_token_hidden = []
+    pre_result_hidden = []
     predicted_text = ""
-    first = 0
+    flag = 0
     with torch.no_grad():
         for _ in range(512):
-            outputs = source.model(**input_ids)
-            logits = output.logits
+            outputs = source_model(**input_ids)
+            logits = outputs.logits
             predicted_token_id = torch.argmax(logits[:, -1, :], dim=-1)
             predicted_text += source_tokenizer.decode(predicted_token_id, skip_special_tokens=True)
             input_ids = {"input_ids": torch.cat([input_ids["input_ids"], predicted_token_id.unsqueeze(-1)], dim=-1)}
             if _ == 0:
                 first_token_hidden = hidden_representation.clone()
-            if "\\boxed{" in predicted_text and first <= 1:
                 for h in hooks:
                     h.remove()
+            if "\\boxed{" in predicted_text and flag == 0:
                 hidden_representation = torch.zeros((input_ids['input_ids'].shape[0], input_ids['input_ids'].shape[1], n_layers, source_model.config.hidden_size))
                 hooks = [layer.register_forward_hook(store_source_activations(layer_id)) for layer_id, layer in enumerate(layers)]
+                flag += 1
+            if "\\boxed{" in predicted_text and flag == 1:
                 pre_result_hidden = hidden_representation.clone()
-                first += 1
+                for h in hooks:
+                    h.remove()
+                flag += 1
             if re.search(r"\\boxed{.*?}", predicted_text):
                 break
-
-    for h in hooks:
-        h.remove()
 
     return first_token_hidden, pre_result_hidden, predicted_text
 
@@ -94,10 +95,8 @@ def patch_target_model(
                         target_model,
                         target_tokenizer,
                         target_prompt,
-                        source_layer_id: int,
                         target_layer_id: int,
                         target_token_id: int,
-                        source_token_id: int,
                         hidden_representation: torch.Tensor,
                         device
 ) -> torch.Tensor:
@@ -106,7 +105,7 @@ def patch_target_model(
                             target_token_id: int,
                             source_token_id: int):
         def patching_hook(module, input, output):
-            output[0][:, target_token_id, :] = f(hidden_representation[:, source_token_id, source_layer_id, :])
+            output[0][:, target_token_id, :] = f(hidden_representation)
             return output
         return patching_hook
 
@@ -133,69 +132,6 @@ def patch_target_model(
         hook_handle.remove()
     
     return predicted_token, last_token_logits
-
-
-def patchscope(
-        samples, 
-        source_model, 
-        source_tokenizer, 
-        target_model, 
-        target_tokenizer, 
-        device, 
-        source_layer_id, 
-        target_layer_id, 
-        target_token_id, 
-        source_token_id
-):
-    """
-    Operates patchscope on given samples:
-    1. Checks if the target model generates the correct answer without patching.
-    2. If correct, applies patching and checks the new prediction.
-    
-    Args:
-    - samples: List of sample dictionaries containing prompts and ground truth answers.
-    - source_model: The model providing hidden representations.
-    - source_tokenizer: Tokenizer for the source model.
-    - target_model: The model to be patched.
-    - target_tokenizer: Tokenizer for the target model.
-    - device: The computation device (CPU/GPU).
-    - source_layer_id: The layer index from which to extract the hidden representation.
-    - target_layer_id: The layer index in the target model where patching is applied.
-    - target_token_id: Token index in the target model where the patching is applied.
-    - source_token_id: Token index in the source model where the hidden state is extracted.
-    
-    Returns:
-    - results: A list containing results for each sample.
-    """
-    results = []
-    for sample in tqdm(samples, total=len(samples)):
-        idx = sample["idx"]
-        source_prompt = sample["source_prompt"]
-        target_prompt = sample["target_prompt"]
-        ground_truth = sample["gt"]
-        n_digits = get_digit(ground_truth)
-        # Get hidden representation and unpatched prediction in a single pass
-        hidden_representation, unpatched_prediction = get_hidden_representation(
-            source_model, source_tokenizer, source_prompt, n_digits, device
-        )
-
-        # Step 2: If correct, apply patching and check the new prediction
-        patched_prediction, _ = patch_target_model(
-            target_model, target_tokenizer, target_prompt,
-            target_layer_id,
-            target_token_id, 
-            hidden_representation[:, source_token_id, source_layer_id, :], device
-        )
-
-        results.append({
-            "idx": idx,
-            "question": sample["question"],
-            "gt": ground_truth,
-            "unpatched_pred": unpatched_prediction,
-            "patched_pred": patched_prediction
-        })
-
-    return results
 
 def patchscope_eval(
         samples, 
@@ -303,6 +239,7 @@ def patchscope_eval_cot(samples, source_model, source_tokenizer, target_model, t
         first_token_hidden, pre_result_hidden, output_text = get_hidden_representation_cot_eval(source_model, source_tokenizer, source_prompt, device)
         hidden_representations[idx] = [first_token_hidden, pre_result_hidden]
         sample["first_token"] = output_text.strip(" ")[0]
+        sample["target_token_id"] = args.target_token_id
         if ground_truth == get_result_from_box(output_text):
             remain_samples.append(sample)
 
@@ -344,7 +281,7 @@ def patchscope_eval_cot(samples, source_model, source_tokenizer, target_model, t
             patched_prediction_result, result_logits = patch_target_model(
             target_model, target_tokenizer, sample["target_prompt"],
             target_layer_id,
-            sample["target_token_id"], 
+            args.target_token_id,
             pre_result_hidden[:, -1, layer_id, :], device
             )
 
@@ -359,9 +296,9 @@ def patchscope_eval_cot(samples, source_model, source_tokenizer, target_model, t
                     "patched_pred": patched_prediction_result,
                     "target_prompt": sample["target_prompt"],
                     "source_id" : sample["source_token_id"],
-                    "surprisal" : compute_surprisal(result_logits, target_tokenizer.encode(sample["gt"][0]))
-                    "first_token_gt" : sample["first_token"]
-                    "first_token_predict" = patched_prediction_first
+                    "surprisal" : compute_surprisal(result_logits, target_tokenizer.encode(sample["gt"][0])),
+                    "first_token_gt" : sample["first_token"],
+                    "first_token_predict" : patched_prediction_first,
                 }
                 results.append(result)                
         print("Accuracy: ", correct/length, "Surprisal: ", surprise/length)
@@ -373,17 +310,3 @@ def patchscope_eval_cot(samples, source_model, source_tokenizer, target_model, t
     return results, accuracy_first, accuracy_r, surprisal_first, surprisal_r
 
 
-
-if __name__=="__main__":
-     # Load model and tokenizer
-    source_model, source_tokenizer= load_model_and_tokenizer("Qwen/Qwen2.5-Math-1.5B-Instruct")
-    target_model, target_tokenizer= load_model_and_tokenizer("Qwen/Qwen2.5-Math-1.5B-Instruct")
-    # Ensure CUDA is available
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    few_shot_examples = [{"question": "There are 15 trees in the grove. Grove workers will plant trees in the grove today. After they are done, there will be 21 trees. How many trees did the grove workers plant today?", "answer": "6"},
-                        {"question":"If there are 3 cars in the parking lot and 2 more cars arrive, how many cars are in the parking lot?", "answer": "5"},
-                        ]
-
-    source_prompt = generate_few_shot_prompt(few_shot_examples, "Jeff\u2019s work is 3 miles away.  He walks there and back each day he works.  How many miles does he walk if he has to work 5 times a week?")
-    target_prompt = "What is the result of 1*1+1?"
-    print("Response: ", generate_response(source_model, source_tokenizer, source_prompt))

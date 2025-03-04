@@ -172,15 +172,6 @@ def extract_model_name(model_str: str) -> str:
     return match.group(1) if match else model_str
 
 def get_result_from_box(text: str) -> str:
-    """
-    Extracts the content inside \boxed{} from a given text.
-
-    Args:
-        text (str): The input text containing \boxed{result}.
-
-    Returns:
-        str: The extracted result, or an empty string if no match is found.
-    """
     match = re.search(r'\\boxed{([^}]*)}', text)
     return match.group(1) if match else ""
     
@@ -214,17 +205,18 @@ PROMPT_TEMPLATES = {
     ),
 }
 
-def construct_prompt(example, data_name, args):
+def construct__prompt(example, data_name, args):
 
     prompt_type = args.prompt_type
-    prompt_temp = PROMPT_TEMPLATES[args.prompt_type]
+    demos = get_examples(prompt_type)[data_name][: args.num_shots]
+    prompt_temp = PROMPT_TEMPLATES[prompt_type]
 
-    splitter = prompt_temp[2]
     input_template, output_template, splitter = (
         prompt_temp[0],
         prompt_temp[1],
         prompt_temp[2],
     )
+
     if "qwen" in args.prompt_type:
         # Hotfix to support putting all demos into a single turn
         demo_prompt = splitter.join([q + "\n" + a for q, a in demos])
@@ -246,37 +238,11 @@ def construct_prompt(example, data_name, args):
         else:
             full_prompt = demo_prompt + splitter + context
 
-    return full_prompt.strip(" ")  # important!
+    full_prompt = words_to_numbers(full_prompt).strip(" ")
+    if 'direct' in prompt_type:
+        full_prompt += " "
 
-def construct_few_shot_prompt(example, data_name, args):
-
-    prompt_type = args.prompt_type
-    prompt_temp = PROMPT_TEMPLATES[prompt_type]
-
-    splitter = prompt_temp[2]
-    input_template, output_template, _ = prompt_temp
-
-    # Retrieve and limit the number of few-shot examples
-    demos = get_examples(prompt_type)[data_name][: args.num_shots]
-
-    # Construct the few-shot demonstration part
-    demo_prompt = splitter.join(
-        [
-            input_template.format(input=q) + output_template.format(output=a)
-            for q, a in demos
-        ]
-    )
-
-    # Format the final context for the target example
-    context = input_template.format(input=example["question"])
-
-    # Construct the full prompt
-    if not demo_prompt:
-        full_prompt = context
-    else:
-        full_prompt = demo_prompt + splitter + context
-
-    return words_to_numbers(full_prompt).strip(" ") + " "
+    return full_prompt
 
 
 def generate_target_prompt(tokenizer, k=None):
