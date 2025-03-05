@@ -67,7 +67,7 @@ def get_hidden_representation_cot_eval(source_model, source_tokenizer, prompt, d
             if _ == 0:
                 first_token_hidden = hidden_representation.clone()
                 first_token_id = predicted_token_id
-            if "\\boxed{" in predicted_text and predicted_text[-1] != "{" and Flag: 
+            if "\\boxed{" in predicted_text and predicted_text[-1] != "{" and flag: 
                 pre_result_hidden = hidden_representation.clone()
                 for h in hooks:
                     h.remove()
