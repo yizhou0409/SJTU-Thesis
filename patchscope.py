@@ -3,7 +3,6 @@ from model import *
 from utils import *
 from tqdm import tqdm
 import argparse
-from transformers import StoppingCriteria, StoppingCriteriaList
 import re
 
 
@@ -233,7 +232,7 @@ def patchscope_eval_cot(samples, source_model, source_tokenizer, target_model, t
         surprise_r = 0
 
         for sample in tqdm(remain_samples, total = length):
-            first_token_hidden, pre_result_hidden = hidden_representations[sample['idx']][0], hidden_representations[sample['idx']][1]
+            first_token_hidden, pre_result_hidden = hidden_representations[sample['idx']][0].to(device), hidden_representations[sample['idx']][1].to(device)
             # Check first token
             patched_prediction_first, first_logits = patch_target_model(
             target_model, target_tokenizer, sample["target_prompt"],
@@ -251,8 +250,7 @@ def patchscope_eval_cot(samples, source_model, source_tokenizer, target_model, t
             target_layer_id,
             pre_result_hidden[:, layer_id, :], device
             )
-
-            if patched_prediction_result[0] == target_tokenizer.encode(sample["gt"][0]):
+            if list(patched_prediction_result) == target_tokenizer.encode(sample["gt"][0]):
                 correct_r += 1
             surprise_r += compute_surprisal(result_logits, target_tokenizer.encode(sample["gt"][0]))
             if layer_id == n_layers - 1:
