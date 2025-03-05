@@ -20,7 +20,7 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--data_names", default="gsm8k,math", type=str)
     parser.add_argument("--data_dir", default="./data", type=str)
-    parser.add_argument("--source_model_name", default="Qwen/Qwen2.5-Math-1.5B-Instruct", type=str)
+    parser.add_argument("--source_model_name", default="Qwen/Qwen2.5-Math-7B-Instruct", type=str)
     parser.add_argument("--target_model_name", default="same", type=str) # same or specify a model name
     parser.add_argument("--eval_target_layer", default="same", type=str) #use_arg, same
     parser.add_argument("--target_layer_id", default=-1, type=int)
@@ -70,15 +70,16 @@ def setup(args):
     for data_name in data_list:
         torch.cuda.empty_cache()  # Clear memory before processing a new dataset
         gc.collect()  # Force garbage collection
-        main_eval(source_model, target_model, source_tokenizer, target_tokenizer, data_name, args, device)
+        eval(source_model, target_model, source_tokenizer, target_tokenizer, data_name, args, device)
 
-def main_eval(source_model, target_model, source_tokenizer, target_tokenizer, data_name, args, device):
+def eval(source_model, target_model, source_tokenizer, target_tokenizer, data_name, args, device):
     examples, out_file = prepare_data(data_name, args)
     print("=" * 50)
     print("data:", data_name, ", remain samples:", len(examples))
     if len(examples) > 0:
         print(examples[0])
 
+    # Prepare samples, prompts, target prompts
     samples = []
     for example in tqdm(examples, total=len(examples)):
         idx = example["idx"]
@@ -121,7 +122,7 @@ def main_eval(source_model, target_model, source_tokenizer, target_tokenizer, da
         plot_surprisal_curve(surprisal_r, surprisal_r_file_dir)        
         plot_surprisal_curve(surprisal_first, surprisal_first_file_dir)                                                                   
     else:
-        results, accuracy, surprisal = patchscope_eval(samples, 
+        results, accuracy, surprisal = patchscope_eval_direct(samples, 
                                                     source_model, 
                                                     source_tokenizer, 
                                                     target_model, 
