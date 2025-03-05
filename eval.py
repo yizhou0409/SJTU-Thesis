@@ -1,7 +1,6 @@
 import random
 import os
 import argparse
-import time
 import torch
 import json
 import gc
@@ -16,7 +15,6 @@ from parser import *
 from data_loader import *
 from model import load_model_and_tokenizer
 from patchscope import *
-from evaluate import evaluate
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -24,15 +22,12 @@ def parse_args():
     parser.add_argument("--data_dir", default="./data", type=str)
     parser.add_argument("--source_model_name", default="Qwen/Qwen2.5-Math-1.5B-Instruct", type=str)
     parser.add_argument("--target_model_name", default="same", type=str) # same or specify a model name
-    parser.add_argument("--eval_source_token", default="use_arg", type=str) #last_word, last_digit, last, use_arg
     parser.add_argument("--eval_target_layer", default="same", type=str) #use_arg, same
     parser.add_argument("--target_layer_id", default=-1, type=int)
-    parser.add_argument("--source_token_id", default=-1, type=int)
-    parser.add_argument("--target_token_id", default=-1, type=int)
     parser.add_argument("--output_dir", default="./output", type=str)
     parser.add_argument("--prompt_type", default="qwen25-math-cot", type=str) #qwen25-math-cot, direct
     parser.add_argument("--num_shots", default=0, type=int)
-    parser.add_argument("--num_test_sample", default=-1, type=int)  # -1 for full data
+    parser.add_argument("--num_test_sample", default=20, type=int)  # -1 for full data
     parser.add_argument("--split", default="test", type=str)
     parser.add_argument("--start", default=0, type=int)
     parser.add_argument("--end", default=-1, type=int)
@@ -56,14 +51,12 @@ def setup(args):
     source_model, source_tokenizer = load_model_and_tokenizer(
         model_name=args.source_model_name,
         load_in_half=True,
-        use_safetensors=args.use_safetensors,
     )
-    target_model, target_tokenizer = source_model, source_tokenizer
+    target_model, target_tokenizer = source_model, source_tokenizer #If same model, save CUDA memory
     if args.target_model_name != 'same':
         target_model, target_tokenizer = load_model_and_tokenizer(
             model_name=args.target_model_name,
             load_in_half=True,
-            use_safetensors=args.use_safetensors,
         )    
 
     if torch.cuda.device_count() > 1:
@@ -80,7 +73,6 @@ def setup(args):
         main_eval(source_model, target_model, source_tokenizer, target_tokenizer, data_name, args, device)
 
 def main_eval(source_model, target_model, source_tokenizer, target_tokenizer, data_name, args, device):
-    start_time = time.time()
     examples, out_file = prepare_data(data_name, args)
     print("=" * 50)
     print("data:", data_name, ", remain samples:", len(examples))
@@ -120,13 +112,13 @@ def main_eval(source_model, target_model, source_tokenizer, target_tokenizer, da
                                                                                                 target_tokenizer, 
                                                                                                 device, 
                                                                                                 args)
-        accuracy_r_file_dir = out_file.replace(".jsonl", f"{args.source_token_id}_{args.eval_source_token}_accuracy_r_curve.png")
-        accuracy_first_file_dir = out_file.replace(".jsonl", f"{args.source_token_id}_{args.eval_source_token}_accuracy_first_curve.png")
-        surprisal_r_file_dir = out_file.replace(".jsonl", f"{args.source_token_id}_{args.eval_source_token}_surprisal_r_curve.png")
-        surprisal_first_file_dir = out_file.replace(".jsonl", f"{args.source_token_id}_{args.eval_source_token}_surprisal_first_curve.png")
+        accuracy_r_file_dir = out_file.replace(".jsonl", f"_accuracy_r_curve.png")
+        accuracy_first_file_dir = out_file.replace(".jsonl", f"_accuracy_first_curve.png")
+        surprisal_r_file_dir = out_file.replace(".jsonl", f"_surprisal_r_curve.png")
+        surprisal_first_file_dir = out_file.replace(".jsonl", f"_surprisal_first_curve.png")
         plot_accuracy_curve(accuracy_r, accuracy_r_file_dir)
         plot_accuracy_curve(accuracy_first, accuracy_first_file_dir)
-        plot_surprisal_curve(surprisal_r, surprisal__r_file_dir)        
+        plot_surprisal_curve(surprisal_r, surprisal_r_file_dir)        
         plot_surprisal_curve(surprisal_first, surprisal_first_file_dir)                                                                   
     else:
         results, accuracy, surprisal = patchscope_eval(samples, 
@@ -137,22 +129,15 @@ def main_eval(source_model, target_model, source_tokenizer, target_tokenizer, da
                                                     device, 
                                                     args)
 
-        accuracy_file_dir = out_file.replace(".jsonl", f"{args.source_token_id}_{args.eval_source_token}_accuracy_curve.png")
-        surprisal_file_dir = out_file.replace(".jsonl", f"{args.source_token_id}_{args.eval_source_token}_surprisal_curve.png")
+        accuracy_file_dir = out_file.replace(".jsonl", f"_accuracy_curve.png")
+        surprisal_file_dir = out_file.replace(".jsonl", f"_surprisal_curve.png")
         plot_accuracy_curve(accuracy, accuracy_file_dir)
         plot_surprisal_curve(surprisal, surprisal_file_dir)
 
-    with open(out_file, "w") as f:
-        json.dump(results, f, indent=4)
-    # Process all outputs
-    result_json = evaluate(outputs)
-    time_use = time.time() - start_time
-    result_json["time_use_in_second"] = time_use
-    result_json["time_use_in_minute"] = f"{int(time_use // 60)}:{int(time_use % 60):02d}"
-    with open(out_file.replace(".jsonl", f"_{args.prompt_type}_metrics.json"), "w") as f:
-        json.dump(result_json, f, indent=4)
+    with open(out_file, "w") as file:
+        json.dump(results, file, indent=4)
 
-    return result_json
+    return
 
 if __name__ == "__main__":
     args = parse_args()

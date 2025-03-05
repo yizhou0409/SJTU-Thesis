@@ -65,8 +65,6 @@ def prepare_data(data_name, args):
     output_dir = args.output_dir
     if not os.path.exists(output_dir):
         output_dir = f"outputs/{output_dir}"
-    out_file = f"{output_dir}/{data_name}/{out_file_prefix}__{extract_model_name(args.source_model_name)}_sourcetoken{args.eval_source_token}{args.source_token_id}__tt{args.target_token_id}_targetlayer{args.eval_target_layer}{args.target_layer_id}.jsonl"
+    out_file = f"{output_dir}/{data_name}/{out_file_prefix}__{extract_model_name(args.source_model_name)}_targetlayer{args.eval_target_layer}{args.target_layer_id}.jsonl"
     os.makedirs(f"{output_dir}/{data_name}", exist_ok=True)
-    return examples, [], out_file
-
-    
+    return examples, out_file

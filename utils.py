@@ -205,7 +205,7 @@ PROMPT_TEMPLATES = {
     ),
 }
 
-def construct__prompt(example, data_name, args):
+def construct_prompt(example, data_name, args):
 
     prompt_type = args.prompt_type
     demos = get_examples(prompt_type)[data_name][: args.num_shots]
