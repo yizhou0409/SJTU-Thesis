@@ -261,68 +261,74 @@ def generate_target_prompt(tokenizer, k=None):
 
 import matplotlib.pyplot as plt
 
-def plot_accuracy_curve(accuracy, file_dir=None):
+def plot_accuracy_curves(accuracy_dict, file_dir=None):
     """
-    Plots the accuracy curve across different layers.
+    Plots multiple accuracy curves across different layers.
 
     Parameters:
-        accuracy (list): A list of accuracy values corresponding to each layer.
-        n_layers (int): The total number of layers.
-
-    Returns:
-        None
+        accuracy_dict (dict): A dictionary where keys are labels (str) and values are accuracy lists.
+        file_dir (str, optional): Path to save the figure.
     """
-    layers = list(range(len(accuracy)))  # x-axis: layer indices
-
     plt.figure(figsize=(8, 5))
-    plt.plot(layers, accuracy, marker='o', linestyle='-', color='b', markersize=6, linewidth=2, label="Accuracy")
-
+    
+    colors = ['b', 'g', 'r', 'c', 'm', 'y', 'k']  # Color cycle for different lines
+    markers = ['o', 's', 'D', '^', 'v', 'p', '*']  # Different markers
+    
+    valid_entries = {label: acc for label, acc in accuracy_dict.items() if acc}  # Filter out empty lists
+    
+    for (label, accuracy), color, marker in zip(valid_entries.items(), colors, markers):
+        layers = list(range(len(accuracy)))  # x-axis: layer indices
+        plt.plot(layers, accuracy, marker=marker, linestyle='-', color=color, markersize=6, linewidth=2, label=label)
+    
     # Beautify the plot
     plt.xlabel("Layer Index", fontsize=12)
     plt.ylabel("Accuracy", fontsize=12)
-    plt.title("Accuracy Curve Across Layers", fontsize=14, fontweight='bold')
+    plt.title("Accuracy Curves Across Layers", fontsize=14, fontweight='bold')
     plt.xticks(fontsize=10)
     plt.yticks(fontsize=10)
     plt.grid(True, linestyle="--", alpha=0.6)
-    plt.legend(fontsize=12)
+    plt.legend(fontsize=10, loc='best')
     plt.tight_layout()
-
+    
     if file_dir:
-        os.makedirs(os.path.dirname(file_dir), exist_ok=True)  # Ensure the directory exists
-        plt.savefig(file_dir, dpi=300, bbox_inches='tight')  # Save with high resolution
+        os.makedirs(os.path.dirname(file_dir), exist_ok=True)
+        plt.savefig(file_dir, dpi=300, bbox_inches='tight')
         print(f"Figure saved to {file_dir}")
-    # Show the plot
+    
     plt.show()
 
-def plot_surprisal_curve(accuracy, file_dir=None):
+def plot_surprisal_curves(surprisal_dict, file_dir=None):
     """
-    Plots the accuracy curve across different layers.
+    Plots multiple surprisal curves across different layers.
 
     Parameters:
-        accuracy (list): A list of accuracy values corresponding to each layer.
-        n_layers (int): The total number of layers.
-
-    Returns:
-        None
+        surprisal_dict (dict): A dictionary where keys are labels (str) and values are surprisal lists.
+        file_dir (str, optional): Path to save the figure.
     """
-    layers = list(range(len(accuracy)))  # x-axis: layer indices
-
     plt.figure(figsize=(8, 5))
-    plt.plot(layers, accuracy, marker='o', linestyle='-', color='b', markersize=6, linewidth=2, label="Surprisal")
-
+    
+    colors = ['b', 'g', 'r', 'c', 'm', 'y', 'k']  # Color cycle for different lines
+    markers = ['o', 's', 'D', '^', 'v', 'p', '*']  # Different markers
+    
+    valid_entries = {label: surprisal for label, surprisal in surprisal_dict.items() if surprisal}  # Filter out empty lists
+    
+    for (label, surprisal), color, marker in zip(valid_entries.items(), colors, markers):
+        layers = list(range(len(surprisal)))  # x-axis: layer indices
+        plt.plot(layers, surprisal, marker=marker, linestyle='-', color=color, markersize=6, linewidth=2, label=label)
+    
     # Beautify the plot
     plt.xlabel("Layer Index", fontsize=12)
     plt.ylabel("Surprisal", fontsize=12)
-    plt.title("Surprisal Curve Across Layers", fontsize=14, fontweight='bold')
+    plt.title("Surprisal Curves Across Layers", fontsize=14, fontweight='bold')
     plt.xticks(fontsize=10)
     plt.yticks(fontsize=10)
     plt.grid(True, linestyle="--", alpha=0.6)
-    plt.legend(fontsize=12)
+    plt.legend(fontsize=10, loc='best')
     plt.tight_layout()
-
+    
     if file_dir:
-        os.makedirs(os.path.dirname(file_dir), exist_ok=True)  # Ensure the directory exists
-        plt.savefig(file_dir, dpi=300, bbox_inches='tight')  # Save with high resolution
+        os.makedirs(os.path.dirname(file_dir), exist_ok=True)
+        plt.savefig(file_dir, dpi=300, bbox_inches='tight')
         print(f"Figure saved to {file_dir}")
-    # Show the plot
+    
     plt.show()

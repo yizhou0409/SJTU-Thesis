@@ -20,9 +20,12 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--data_names", default="gsm8k,math", type=str)
     parser.add_argument("--data_dir", default="./data", type=str)
-    parser.add_argument("--source_model_name", default="Qwen/Qwen2.5-Math-7B-Instruct", type=str)
+    parser.add_argument("--source_model_name", default="Qwen/Qwen2.5-Math-1.5B-Instruct", type=str)
     parser.add_argument("--target_model_name", default="same", type=str) # same or specify a model name
     parser.add_argument("--eval_target_layer", default="same", type=str) #use_arg, same
+    parser.add_argument("--eval_first_token", action="store_false")
+    parser.add_argument("--eval_numbers", action="store_false")
+    parser.add_argument("--eval_operators", action="store_false")
     parser.add_argument("--target_layer_id", default=-1, type=int)
     parser.add_argument("--output_dir", default="./output", type=str)
     parser.add_argument("--prompt_type", default="qwen25-math-cot", type=str) #qwen25-math-cot, direct
@@ -31,15 +34,9 @@ def parse_args():
     parser.add_argument("--split", default="test", type=str)
     parser.add_argument("--start", default=0, type=int)
     parser.add_argument("--end", default=-1, type=int)
-    parser.add_argument("--temperature", default=0, type=float)
-    parser.add_argument("--top_p", default=1, type=float)
-    parser.add_argument("--max_tokens_per_call", default=2048, type=int)
     parser.add_argument("--seed", default=42, type=int)
-    parser.add_argument("--sampling", action="store_true")
-    parser.add_argument("--n_samples", default=500, type=int)
-    parser.add_argument("--shuffle", action="store_true")
-    parser.add_argument("--save_outputs", action="store_true")
-    parser.add_argument("--overwrite", action="store_true")
+    parser.add_argument("--max_token_gen", default=512, type=int)
+    parser.add_argument("--shuffle", action='store_true')
 
     args = parser.parse_args()
     return args
@@ -105,36 +102,35 @@ def eval(source_model, target_model, source_tokenizer, target_tokenizer, data_na
             }
             samples.append(sample)
 
-    if 'cot' in args.prompt_type:
-        results, accuracy_first, accuracy_r, surprisal_first, surprisal_r = patchscope_eval_cot(samples, 
+    results, accuracy_result, surprisal_result, accuracy_first, surprisal_first, accuracy_operators, surprisal_operators, accuracy_numbers, surprisal_numbers = patchscope_eval(samples, 
                                                                                                 source_model, 
                                                                                                 source_tokenizer, 
                                                                                                 target_model, 
                                                                                                 target_tokenizer, 
                                                                                                 device, 
                                                                                                 args)
-        accuracy_r_file_dir = out_file.replace(".jsonl", f"_accuracy_r_curve.png")
-        accuracy_first_file_dir = out_file.replace(".jsonl", f"_accuracy_first_curve.png")
-        surprisal_r_file_dir = out_file.replace(".jsonl", f"_surprisal_r_curve.png")
-        surprisal_first_file_dir = out_file.replace(".jsonl", f"_surprisal_first_curve.png")
-        plot_accuracy_curve(accuracy_r, accuracy_r_file_dir)
-        plot_accuracy_curve(accuracy_first, accuracy_first_file_dir)
-        plot_surprisal_curve(surprisal_r, surprisal_r_file_dir)        
-        plot_surprisal_curve(surprisal_first, surprisal_first_file_dir)                                                                   
-    else:
-        results, accuracy, surprisal = patchscope_eval_direct(samples, 
-                                                    source_model, 
-                                                    source_tokenizer, 
-                                                    target_model, 
-                                                    target_tokenizer, 
-                                                    device, 
-                                                    args)
 
-        accuracy_file_dir = out_file.replace(".jsonl", f"_accuracy_curve.png")
-        surprisal_file_dir = out_file.replace(".jsonl", f"_surprisal_curve.png")
-        plot_accuracy_curve(accuracy, accuracy_file_dir)
-        plot_surprisal_curve(surprisal, surprisal_file_dir)
+    accuracy_file_dir = out_file.replace(".jsonl", f"_accuracy_curve.png")
+    surprisal_file_dir = out_file.replace(".jsonl", f"_surprisal_curve.png")
 
+    # Print Curves
+    accuracy_dict = {
+        "Result": accuracy_result,
+        "First Token": accuracy_first,
+        "Operators": accuracy_operators,
+        "Numbers": accuracy_numbers
+    }
+    plot_accuracy_curves(accuracy_dict, accuracy_file_dir)
+
+    surprisal_dict = {
+        "Result": surprisal_result,
+        "First Token": surprisal_first,
+        "Operators": surprisal_operators,
+        "Numbers": surprisal_numbers
+    }
+    plot_surprisal_curves(surprisal_dict, surprisal_file_dir)
+    
+    # Save result Json                              
     with open(out_file, "w") as file:
         json.dump(results, file, indent=4)
 
