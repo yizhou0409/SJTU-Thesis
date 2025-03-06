@@ -65,7 +65,7 @@ def get_examples(prompt_type):
         examples["gsm8k"] = [
             (
                 "There are 15 trees in the grove. Grove workers will plant trees in the grove today. After they are done, there will be 21 trees. How many trees did the grove workers plant today?",
-                "There are 15 trees originally. Then there were 21 trees after some more were planted. So there must have been 21 - 15 = 6. The answer is 6.",
+                "There are 15 trees originally. Then there were 21 trees after some more were planted. So there must have been 21 - 15 = 6. The answer is \\boxed{{6}}.",
             ),
             (
                 "If there are 3 cars in the parking lot and 2 more cars arrive, how many cars are in the parking lot?",
@@ -123,15 +123,15 @@ def get_examples(prompt_type):
         examples["gsm8k"] = [
             (
                 "There are 15 trees in the grove. Grove workers will plant trees in the grove today. After they are done, there will be 21 trees. How many trees did the grove workers plant today?",
-                "6",
+                "\\boxed{{6}}",
             ),
             (
                 "If there are 3 cars in the parking lot and 2 more cars arrive, how many cars are in the parking lot?",
-                "5",
+                "\\boxed{{5}}",
             ),
             (
                 "Leah had 32 chocolates and her sister had 42. If they ate 35, how many pieces do they have left in total?",
-                "39",
+                "\\boxed{{39}}",
             ),
             (
                 "Jason had 20 lollipops. He gave Denny some lollipops. Now Jason has 12 lollipops. How many lollipops did Jason give to Denny?",
@@ -158,7 +158,7 @@ def get_examples(prompt_type):
         examples["math"] = [
             (
                 "If $f(x)=\\frac{ax+b}{cx+d}, abcd\\not=0$ and $f(f(x))=x$ for all $x$ in the domain of $f$, what is the value of $a+d$?",
-                "0",
+                "\\boxed{{0}}",
             ),
 
         ]
