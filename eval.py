@@ -26,6 +26,7 @@ def parse_args():
     parser.add_argument("--eval_first_token", action="store_false")
     parser.add_argument("--eval_numbers", action="store_false")
     parser.add_argument("--eval_operators", action="store_false")
+    parser.add_argument("--eval_batchsize", default=128, type=int) # Use batchsize to prevent OOM
     parser.add_argument("--target_layer_id", default=-1, type=int)
     parser.add_argument("--output_dir", default="./output", type=str)
     parser.add_argument("--prompt_type", default="qwen25-math-cot", type=str) #qwen25-math-cot, direct
@@ -70,6 +71,9 @@ def setup(args):
         eval(source_model, target_model, source_tokenizer, target_tokenizer, data_name, args, device)
 
 def eval(source_model, target_model, source_tokenizer, target_tokenizer, data_name, args, device):
+
+    _, n_layers = get_layers_to_enumerate(source_model)
+
     examples, out_file = prepare_data(data_name, args)
     print("=" * 50)
     print("data:", data_name, ", remain samples:", len(examples))
@@ -102,13 +106,52 @@ def eval(source_model, target_model, source_tokenizer, target_tokenizer, data_na
             }
             samples.append(sample)
 
-    results, accuracy_result, surprisal_result, accuracy_first, surprisal_first, accuracy_operators, surprisal_operators, accuracy_numbers, surprisal_numbers = patchscope_eval(samples, 
-                                                                                                source_model, 
-                                                                                                source_tokenizer, 
-                                                                                                target_model, 
-                                                                                                target_tokenizer, 
-                                                                                                device, 
-                                                                                                args)
+    batchsize = args.eval_batchsize
+    
+    results = []
+    num_samples, num_operators, num_numbers = 0, 0, 0
+    correct_result, surprisal_result = [0 for i in range(n_layers)], [0 for i in range(n_layers)],
+    correct_first, surprisal_first = [0 for i in range(n_layers)] if args.eval_first_token else [], [0 for i in range(n_layers)] if args.eval_first_token else []
+    correct_operators, surprisal_operators = [0 for i in range(n_layers)] if args.eval_operators else [], [0 for i in range(n_layers)] if args.eval_operators else []
+    correct_numbers, surprisal_numbers = [0 for i in range(n_layers)] if args.eval_numbers else [], [0 for i in range(n_layers)] if args.eval_numbers else []
+
+    # Accumulate corrects and surprisal from samples
+    for i in range(0, len(samples), batchsize):
+        print("Batch {} of {}".format(i//batchsize, len(samples)//batchsize))
+        samples_batch = samples[i: i+batchsize]
+        num_samples_batch, results_batch, correct_result_batch, surprisal_result_batch, correct_first_batch, surprisal_first_batch, correct_operators_batch, surprisal_operators_batch, correct_numbers, surprisal_numbers_batch, num_operators_batch, num_numbers_batch = patchscope_eval(
+                                                                samples_batch, 
+                                                                source_model, 
+                                                                source_tokenizer, 
+                                                                target_model, 
+                                                                target_tokenizer, 
+                                                                device, 
+                                                                args)
+        results.extend(results_batch)
+        num_samples += num_samples_batch
+        num_operators += num_operators_batch
+        num_numbers += num_numbers_batch
+        correct_result = [a + b for a, b in zip(correct_result, correct_result_batch)]
+        correct_first = [a + b for a, b in zip(correct_first, correct_first_batch)]
+        correct_operators = [a + b for a, b in zip(correct_operators, correct_operators_batch)]
+        correct_numbers = [a + b for a, b in zip(correct_numbers, correct_numbers_batch)]
+        surprisal_result = [a + b for a, b in zip(surprisal_result, surprisal_result_batch)]
+        surprisal_first = [a + b for a, b in zip(surprisal_first, surprisal_first_batch)]
+        surprisal_operators = [a + b for a, b in zip(surprisal_operators, surprisal_operators_batch)]
+        surprisal_numbers = [a + b for a, b in zip(surprisal_numbers, surprisal_numbers_batch)]
+
+    # Calculate Result
+    accuracy_result = [correct / num_samples for correct in correct_result]
+    surprisal_result = [surprise / num_samples for surprise in surprisal_result]
+    if args.eval_first_token:
+        accuracy_first = [correct / num_samples for correct in correct_first]
+        surprisal_first = [surprise / num_samples for surprise in surprisal_first]
+    if args.eval_operators:
+        accuracy_operators = [correct / num_operators for correct in correct_operators]
+        surprisal_operators = [surprise / num_operators for surprise in surprisal_operators]
+    if args.eval_numbers:
+        accuracy_numbers = [correct / num_numbers for correct in correct_numbers]
+        surprisal_numbers = [surprise / num_numbers for surprise in surprisal_numbers]
 
     accuracy_file_dir = out_file.replace(".jsonl", f"_accuracy_curve.png")
     surprisal_file_dir = out_file.replace(".jsonl", f"_surprisal_curve.png")

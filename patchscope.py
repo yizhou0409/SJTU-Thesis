@@ -103,7 +103,7 @@ def patchscope_eval(samples, source_model, source_tokenizer, target_model, targe
     _, n_layers = get_layers_to_enumerate(source_model)
     target_layer_id = args.target_layer_id
     
-    accuracy_first, accuracy_operators, accuracy_numbers, accuracy_result, surprisal_first, surprisal_operators, surprisal_numbers, surprisal_result = [], [], [], [], [], [], [], []
+    correct_first, correct_operators, correct_numbers, correct_result, surprisal_first, surprisal_operators, surprisal_numbers, surprisal_result = [], [], [], [], [], [], [], []
     num_samples = len(remain_samples)
     
 
@@ -157,27 +157,20 @@ def patchscope_eval(samples, source_model, source_tokenizer, target_model, targe
                     "target_prompt": sample["target_prompt"],
                 }
                 results.append(result)
-        print("Accuracy_result:", correct_result / num_samples, "Surprisal_result:", surprise_result / num_samples)
-        if args.eval_first_token:
-            print("Accuracy_first:", correct_first / num_samples, "Surprisal_first:", surprise_first / num_samples)
-        if args.eval_operators:
-            print("Accuracy_operators:", correct_operators / num_operators, "Num_operators:", num_operators, "Surprisal_operators:", surprise_operators / num_operators)
-        if args.eval_numbers:
-            print("Accuracy_numbers:", correct_numbers / num_numbers, "Num_numbers:", num_numbers, "Surprisal_numbers:", surprise_numbers / num_numbers)
 
-        accuracy_result.append(correct_result / num_samples)
-        surprisal_result.append(surprise_result / num_samples)
+        correct_result.append(correct_result)
+        surprisal_result.append(surprise_result)
 
         if args.eval_first_token:
-            accuracy_first.append(correct_first / num_samples)
-            surprisal_first.append(surprise_first / num_samples)
+            correct_first.append(correct_first)
+            surprisal_first.append(surprise_first)
         
         if args.eval_operators:
-            accuracy_operators.append(correct_operators / num_operators)
-            surprisal_operators.append(surprise_operators / num_operators)
+            correct_operators.append(correct_operators)
+            surprisal_operators.append(surprise_operators)
         
         if args.eval_numbers:
-            accuracy_numbers.append(correct_numbers / num_numbers)
-            surprisal_numbers.append(surprise_numbers / num_numbers)
+            correct_numbers.append(correct_numbers)
+            surprisal_numbers.append(surprise_numbers)
     
-    return results, accuracy_result, surprisal_result, accuracy_first, surprisal_first, accuracy_operators, surprisal_operators, accuracy_numbers, surprisal_numbers
+    return num_samples, results, correct_result, surprisal_result, correct_first, surprisal_first, correct_operators, surprisal_operators, correct_numbers, surprisal_numbers, num_operators, num_numbers
