@@ -18,7 +18,7 @@ from patchscope import *
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--data_names", default="gsm8k,math", type=str)
+    parser.add_argument("--data_names", default="gsm8k", type=str) #gsm8k, math
     parser.add_argument("--data_dir", default="./data", type=str)
     parser.add_argument("--source_model_name", default="Qwen/Qwen2.5-Math-1.5B-Instruct", type=str)
     parser.add_argument("--target_model_name", default="same", type=str) # same or specify a model name
@@ -119,7 +119,7 @@ def eval(source_model, target_model, source_tokenizer, target_tokenizer, data_na
     for i in range(0, len(samples), batchsize):
         print("Batch {} of {}".format(i//batchsize, len(samples)//batchsize))
         samples_batch = samples[i: i+batchsize]
-        num_samples_batch, results_batch, correct_result_batch, surprisal_result_batch, correct_first_batch, surprisal_first_batch, correct_operators_batch, surprisal_operators_batch, correct_numbers, surprisal_numbers_batch, num_operators_batch, num_numbers_batch = patchscope_eval(
+        num_samples_batch, results_batch, correct_result_batch, surprisal_result_batch, correct_first_batch, surprisal_first_batch, correct_operators_batch, surprisal_operators_batch, correct_numbers_batch, surprisal_numbers_batch, num_operators_batch, num_numbers_batch = patchscope_eval(
                                                                 samples_batch, 
                                                                 source_model, 
                                                                 source_tokenizer, 

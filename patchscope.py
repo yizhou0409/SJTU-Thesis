@@ -103,7 +103,7 @@ def patchscope_eval(samples, source_model, source_tokenizer, target_model, targe
     _, n_layers = get_layers_to_enumerate(source_model)
     target_layer_id = args.target_layer_id
     
-    correct_first, correct_operators, correct_numbers, correct_result, surprisal_first, surprisal_operators, surprisal_numbers, surprisal_result = [], [], [], [], [], [], [], []
+    corrects_first, corrects_operators, corrects_numbers, corrects_result, surprisal_first, surprisal_operators, surprisal_numbers, surprisal_result = [], [], [], [], [], [], [], []
     num_samples = len(remain_samples)
     
 
@@ -158,19 +158,19 @@ def patchscope_eval(samples, source_model, source_tokenizer, target_model, targe
                 }
                 results.append(result)
 
-        correct_result.append(correct_result)
+        corrects_result.append(correct_result)
         surprisal_result.append(surprise_result)
 
         if args.eval_first_token:
-            correct_first.append(correct_first)
+            corrects_first.append(correct_first)
             surprisal_first.append(surprise_first)
         
         if args.eval_operators:
-            correct_operators.append(correct_operators)
+            corrects_operators.append(correct_operators)
             surprisal_operators.append(surprise_operators)
         
         if args.eval_numbers:
-            correct_numbers.append(correct_numbers)
+            corrects_numbers.append(correct_numbers)
             surprisal_numbers.append(surprise_numbers)
     
-    return num_samples, results, correct_result, surprisal_result, correct_first, surprisal_first, correct_operators, surprisal_operators, correct_numbers, surprisal_numbers, num_operators, num_numbers
+    return num_samples, results, corrects_result, surprisal_result, corrects_first, surprisal_first, corrects_operators, surprisal_operators, corrects_numbers, surprisal_numbers, num_operators, num_numbers
