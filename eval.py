@@ -18,15 +18,15 @@ from patchscope import *
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--data_names", default="gsm8k", type=str) #gsm8k, math
+    parser.add_argument("--data_names", default="math", type=str) #gsm8k, math
     parser.add_argument("--data_dir", default="./data", type=str)
-    parser.add_argument("--source_model_name", default="Qwen/Qwen2.5-Math-1.5B-Instruct", type=str)
+    parser.add_argument("--source_model_name", default="Qwen/Qwen2.5-Math-7B-Instruct", type=str)
     parser.add_argument("--target_model_name", default="same", type=str) # same or specify a model name
     parser.add_argument("--eval_target_layer", default="same", type=str) #use_arg, same
     parser.add_argument("--eval_first_token", action="store_false")
     parser.add_argument("--eval_numbers", action="store_false")
     parser.add_argument("--eval_operators", action="store_false")
-    parser.add_argument("--eval_batchsize", default=128, type=int) # Use batchsize to prevent OOM
+    parser.add_argument("--eval_batchsize", default=64, type=int) # Use batchsize to prevent OOM
     parser.add_argument("--target_layer_id", default=-1, type=int)
     parser.add_argument("--output_dir", default="./output", type=str)
     parser.add_argument("--prompt_type", default="qwen25-math-cot", type=str) #qwen25-math-cot, direct
@@ -66,6 +66,7 @@ def setup(args):
 
     print("Mode: Eval, Prompt_type: {}".format(args.prompt_type))
     for data_name in data_list:
+        data_name = data_name.strip(" ")
         torch.cuda.empty_cache()  # Clear memory before processing a new dataset
         gc.collect()  # Force garbage collection
         eval(source_model, target_model, source_tokenizer, target_tokenizer, data_name, args, device)
