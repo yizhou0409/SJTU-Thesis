@@ -35,7 +35,11 @@ def get_hidden_representation(source_model, source_tokenizer, source_prompt, tok
 
             # Patch Important Tokens
             if predicted_token in tokens:
-                token_representations.append((predicted_token_id, predicted_token, [layer.half().cpu() for layer in outputs.hidden_states]))
+                if predicted_token == '*':
+                    if predicted_text[-1].isdigit() or predicted_text[-2].isdigit():
+                        token_representations.append((predicted_token_id, predicted_token, [layer.half().cpu() for layer in outputs.hidden_states]))
+                else:
+                    token_representations.append((predicted_token_id, predicted_token, [layer.half().cpu() for layer in outputs.hidden_states]))
             predicted_text += predicted_token
             if re.search(r"\\boxed{.*?}", predicted_text):
                 break
@@ -95,9 +99,15 @@ def patchscope_eval(samples, source_model, source_tokenizer, target_model, targe
             ground_truth = sample["gt"]
             predicted_text, result_hidden, first_token_hidden, token_representations = get_hidden_representation(
                 source_model, source_tokenizer, source_prompt, tokens, args, device)
-            if ground_truth == get_result_from_box(predicted_text):
-                hidden_representations[idx] = (result_hidden, first_token_hidden, token_representations)
-                remain_samples.append(sample)
+            sample["predicted"] = get_result_from_box(predicted_text)
+            if args.eval_wrong_answer:
+                if get_result_from_box(predicted_text) and not math_equal(get_result_from_box(predicted_text), ground_truth):
+                    hidden_representations[idx] = (result_hidden, first_token_hidden, token_representations)
+                    remain_samples.append(sample)
+            else:
+                if math_equal(get_result_from_box(predicted_text), ground_truth):
+                    hidden_representations[idx] = (result_hidden, first_token_hidden, token_representations)
+                    remain_samples.append(sample)
     
     print("Now working on each layer:")
     _, n_layers = get_layers_to_enumerate(source_model)
@@ -120,9 +130,9 @@ def patchscope_eval(samples, source_model, source_tokenizer, target_model, targe
             # Eval result
             pre_result_hidden = hidden_representations[sample['idx']][0][layer_id][:, -1, :].to(device, non_blocking=True)
             patched_prediction, logits = patch_target_model(target_model, target_tokenizer, sample["target_prompt"], target_layer_id, pre_result_hidden, device)
-            if list(patched_prediction) == target_tokenizer.encode(sample["gt"][0]):
+            if list(patched_prediction) == target_tokenizer.encode(sample["predicted"][0]):
                 correct_result += 1
-            surprise_result += compute_surprisal(logits, target_tokenizer.encode(sample["gt"][0]))
+            surprise_result += compute_surprisal(logits, target_tokenizer.encode(sample["predicted"][0]))
             
             # Eval first token
             if args.eval_first_token:
@@ -130,8 +140,7 @@ def patchscope_eval(samples, source_model, source_tokenizer, target_model, targe
                 patched_prediction, logits = patch_target_model(target_model, target_tokenizer, sample["target_prompt"], target_layer_id, first_token_hidden, device)
                 if patched_prediction == first_token_id:
                     correct_first += 1
-                surprise_first += compute_surprisal(logits, first_token_id)
-            
+                surprise_first += compute_surprisal(logits, first_token_id) 
 
             # Eval important tokens
             token_representations = hidden_representations[sample['idx']][2]
@@ -155,6 +164,7 @@ def patchscope_eval(samples, source_model, source_tokenizer, target_model, targe
                     "question": sample["question"],
                     "gt": sample["gt"],
                     "target_prompt": sample["target_prompt"],
+                    "predicted": sample["predicted"],
                 }
                 results.append(result)
 

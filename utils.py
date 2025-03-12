@@ -8,6 +8,8 @@ from pathlib import Path
 import json
 import matplotlib.pyplot as plt
 import re
+import regex
+from math import isclose
 from word2number import w2n
 
 def set_seed(seed: int = 42) -> None:
@@ -54,10 +56,84 @@ def words_to_numbers(sentence: str) -> str:
 
     return number_word_pattern.sub(replace_match, sentence)
 
-def get_digit(num: str):
-    if num.isdigit() and 0 <= int(num) <= 99:
-        return len(num)
+def parse_digits(num):
+    num = regex.sub(",", "", str(num))
+    try:
+        return float(num)
+    except:
+        if num.endswith("%"):
+            num = num[:-1]
+            if num.endswith("\\"):
+                num = num[:-1]
+            try:
+                return float(num) / 100
+            except:
+                pass
     return None
+
+def is_digit(num):
+    # paired with parse_digits
+    return parse_digits(num) is not None
+
+def math_equal(
+    prediction: Union[bool, float, str],
+    reference: Union[float, str],
+    include_percentage: bool = True,
+    is_close: bool = True,
+    timeout: bool = False,
+) -> bool:
+    """
+    Exact match of math if and only if:
+    1. numerical equal: both can convert to float and are equal
+    2. symbolic equal: both can convert to sympy expression and are equal
+    """
+    # print("Judge:", prediction, reference)
+    if prediction is None or reference is None:
+        return False
+    if str(prediction.strip().lower()) == str(reference.strip().lower()):
+        return True
+    if (
+        reference in ["A", "B", "C", "D", "E"]
+        and choice_answer_clean(prediction) == reference
+    ):
+        return True
+
+    try:  # 1. numerical equal
+        if is_digit(prediction) and is_digit(reference):
+            prediction = parse_digits(prediction)
+            reference = parse_digits(reference)
+            # number questions
+            if include_percentage:
+                gt_result = [reference / 100, reference, reference * 100]
+            else:
+                gt_result = [reference]
+            for item in gt_result:
+                try:
+                    if is_close:
+                        if numeric_equal(prediction, item):
+                            return True
+                    else:
+                        if item == prediction:
+                            return True
+                except Exception:
+                    continue
+            return False
+    except:
+        pass
+
+    if not prediction and prediction not in [0, False]:
+        return False
+
+    return False
+
+def numeric_equal(prediction: float, reference: float):
+    # Note that relative tolerance has significant impact
+    # on the result of the synthesized GSM-Hard dataset
+    # if reference.is_integer():
+    #     return isclose(reference, round(prediction), abs_tol=1e-4)
+    # else:
+    # prediction = round(prediction, len(str(reference).split(".")[-1]))
+    return isclose(reference, prediction, rel_tol=1e-4)
 
 def get_examples(prompt_type):
     examples = {}
@@ -178,8 +254,12 @@ def get_result_from_box(text: str) -> str:
 def compute_surprisal(logits, token_id):
     probabilities = F.softmax(logits, dim=-1)
     token_prob = probabilities[:, token_id]
-    surprisal = -torch.log(token_prob+1e-20)
-    return surprisal.item()
+    token_prob = torch.clamp(token_prob, min=1e-10)
+    surprisal = -torch.log(token_prob)
+    if torch.isinf(surprisal):
+        return 10.0
+    else:
+        return surprisal.item()
 
 PROMPT_TEMPLATES = {
     "direct": ("Question: {input}\nAnswer: ", "{output}", "\n"),

@@ -65,6 +65,8 @@ def prepare_data(data_name, args):
     output_dir = args.output_dir
     if not os.path.exists(output_dir):
         output_dir = f"outputs/{output_dir}"
-    out_file = f"{output_dir}/{data_name}/{out_file_prefix}__{extract_model_name(args.source_model_name)}_targetlayer{args.eval_target_layer}{args.target_layer_id}.jsonl"
+    
+    target = "Wrong" if args.eval_wrong_answer else "Right"
+    out_file = f"{output_dir}/{data_name}/{out_file_prefix}_{extract_model_name(args.source_model_name)}_{target}_{args.num_test_sample}.jsonl"
     os.makedirs(f"{output_dir}/{data_name}", exist_ok=True)
     return examples, out_file

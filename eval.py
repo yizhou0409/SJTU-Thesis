@@ -18,11 +18,12 @@ from patchscope import *
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--data_names", default="math", type=str) #gsm8k, math
+    parser.add_argument("--data_names", default="gsm8k", type=str) #gsm8k, math
     parser.add_argument("--data_dir", default="./data", type=str)
-    parser.add_argument("--source_model_name", default="Qwen/Qwen2.5-Math-7B-Instruct", type=str)
+    parser.add_argument("--source_model_name", default="Qwen/Qwen2.5-Math-1.5B-Instruct", type=str)
     parser.add_argument("--target_model_name", default="same", type=str) # same or specify a model name
     parser.add_argument("--eval_target_layer", default="same", type=str) #use_arg, same
+    parser.add_argument("--eval_wrong_answer", action="store_true") # eval right answer or wrong answer
     parser.add_argument("--eval_first_token", action="store_false")
     parser.add_argument("--eval_numbers", action="store_false")
     parser.add_argument("--eval_operators", action="store_false")
@@ -89,15 +90,13 @@ def eval(source_model, target_model, source_tokenizer, target_tokenizer, data_na
         if example["question"] == "":
             continue
         gt_ans = parse_ground_truth(example, data_name)
-        example["gt_ans"] = gt_ans
 
-        source_full_prompt = construct_prompt(example, data_name, args)
-        target_full_prompt = generate_target_prompt(target_tokenizer)
+        if is_digit(gt_ans):
+            source_full_prompt = construct_prompt(example, data_name, args)
+            target_full_prompt = generate_target_prompt(target_tokenizer)
 
-        if idx == args.start:
-            print(source_full_prompt)
-
-        if get_digit(gt_ans):
+            if idx == args.start:
+                print(source_full_prompt)
             sample = {
                 "idx": idx,
                 "question": example["question"],
@@ -178,6 +177,14 @@ def eval(source_model, target_model, source_tokenizer, target_tokenizer, data_na
     with open(out_file, "w") as file:
         json.dump(results, file, indent=4)
 
+    # Save surprisal and accuracy Json
+    accuracy_json_dir = out_file.replace(".jsonl", f"_accuracy.json")
+    surprisal_json_dir = out_file.replace(".jsonl", f"_surprisal.json")
+
+    with open(accuracy_json_dir, "w") as file:
+        json.dump(accuracy_dict, file, indent=4)
+    with open(surprisal_json_dir, "w") as file:
+        json.dump(accuracy_dict, file, indent=4)
     return
 
 if __name__ == "__main__":
