@@ -4,6 +4,7 @@ import argparse
 import torch
 import json
 import gc
+import torch.nn as nn
 
 from tqdm import tqdm
 
@@ -45,7 +46,6 @@ def parse_args():
 
 
 def setup(args):
-    device = "cuda" if torch.cuda.is_available() else "cpu"
 
     source_model, source_tokenizer = load_model_and_tokenizer(
         model_name=args.source_model_name,
@@ -58,11 +58,6 @@ def setup(args):
             load_in_half=True,
         )    
 
-    if torch.cuda.device_count() > 1:
-        print(f"Using {torch.cuda.device_count()} GPUs!")
-        source_model = torch.nn.DataParallel(source_model)
-        target_model = torch.nn.DataParallel(target_model)
-
     data_list = args.data_names.split(",")
 
     print("Mode: Eval, Prompt_type: {}".format(args.prompt_type))
@@ -70,9 +65,9 @@ def setup(args):
         data_name = data_name.strip(" ")
         torch.cuda.empty_cache()  # Clear memory before processing a new dataset
         gc.collect()  # Force garbage collection
-        eval(source_model, target_model, source_tokenizer, target_tokenizer, data_name, args, device)
+        eval(source_model, target_model, source_tokenizer, target_tokenizer, data_name, args)
 
-def eval(source_model, target_model, source_tokenizer, target_tokenizer, data_name, args, device):
+def eval(source_model, target_model, source_tokenizer, target_tokenizer, data_name, args):
 
     _, n_layers = get_layers_to_enumerate(source_model)
 
@@ -125,7 +120,6 @@ def eval(source_model, target_model, source_tokenizer, target_tokenizer, data_na
                                                                 source_tokenizer, 
                                                                 target_model, 
                                                                 target_tokenizer, 
-                                                                device, 
                                                                 args)
         results.extend(results_batch)
         num_samples += num_samples_batch

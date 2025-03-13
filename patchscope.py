@@ -5,8 +5,8 @@ from tqdm import tqdm
 import argparse
 import re
 
-def get_hidden_representation(source_model, source_tokenizer, source_prompt, tokens, args, device):
-    input_ids = source_tokenizer(source_prompt, return_tensors='pt', truncation=True).to(device, non_blocking=True)
+def get_hidden_representation(source_model, source_tokenizer, source_prompt, tokens, args):
+    input_ids = source_tokenizer(source_prompt, return_tensors='pt', truncation=True).to(source_model.device, non_blocking=True)
     
     predicted_text = ""
     result_hidden = None
@@ -50,7 +50,7 @@ def get_hidden_representation(source_model, source_tokenizer, source_prompt, tok
 def f(h):
     return h  # Identity mapping for now
 
-def patch_target_model(target_model, target_tokenizer, target_prompt, target_layer_id: int, hidden_representation: torch.Tensor, device) -> torch.Tensor:
+def patch_target_model(target_model, target_tokenizer, target_prompt, target_layer_id: int, hidden_representation: torch.Tensor) -> torch.Tensor:
     def patching_handler():
         def patching_hook(module, input, output):
             output[0][:, -1, :] = f(hidden_representation)
@@ -61,7 +61,7 @@ def patch_target_model(target_model, target_tokenizer, target_prompt, target_lay
     hook_handle = layers[target_layer_id].register_forward_hook(patching_handler())
     
     try:
-        inputs = target_tokenizer(target_prompt, return_tensors="pt").to(device, non_blocking=True)
+        inputs = target_tokenizer(target_prompt, return_tensors="pt").to(target_model.device, non_blocking=True)
         with torch.no_grad(), torch.cuda.amp.autocast():
             outputs = target_model(**inputs)
         logits = outputs.logits
@@ -73,7 +73,7 @@ def patch_target_model(target_model, target_tokenizer, target_prompt, target_lay
     return predicted_token_id, last_token_logits
 
 
-def patchscope_eval(samples, source_model, source_tokenizer, target_model, target_tokenizer, device, args):
+def patchscope_eval(samples, source_model, source_tokenizer, target_model, target_tokenizer, args):
 
     # Build Important Token List
     operators = ["+","-","*","/"]
@@ -90,7 +90,7 @@ def patchscope_eval(samples, source_model, source_tokenizer, target_model, targe
     remain_samples = []
     print("Getting the hidden representation......")
     
-    batch_size = 16  # Tune based on GPU memory
+    batch_size = 32  # Tune based on GPU memory
     for i in tqdm(range(0, len(samples), batch_size), desc="Processing batches"):
         batch_samples = samples[i:i + batch_size]
         for sample in batch_samples:
@@ -98,7 +98,7 @@ def patchscope_eval(samples, source_model, source_tokenizer, target_model, targe
             source_prompt = sample["source_prompt"]
             ground_truth = sample["gt"]
             predicted_text, result_hidden, first_token_hidden, token_representations = get_hidden_representation(
-                source_model, source_tokenizer, source_prompt, tokens, args, device)
+                source_model, source_tokenizer, source_prompt, tokens, args)
             sample["predicted"] = get_result_from_box(predicted_text)
             if args.eval_wrong_answer:
                 if get_result_from_box(predicted_text) and not math_equal(get_result_from_box(predicted_text), ground_truth):
@@ -128,16 +128,16 @@ def patchscope_eval(samples, source_model, source_tokenizer, target_model, targe
             patched_prediction, logits = None, None
 
             # Eval result
-            pre_result_hidden = hidden_representations[sample['idx']][0][layer_id][:, -1, :].to(device, non_blocking=True)
-            patched_prediction, logits = patch_target_model(target_model, target_tokenizer, sample["target_prompt"], target_layer_id, pre_result_hidden, device)
-            if list(patched_prediction) == target_tokenizer.encode(sample["predicted"][0]):
+            pre_result_hidden = hidden_representations[sample['idx']][0][layer_id][:, -1, :].to(target_model.device, non_blocking=True)
+            patched_prediction, logits = patch_target_model(target_model, target_tokenizer, sample["target_prompt"], target_layer_id, pre_result_hidden)
+            if list(patched_prediction) == target_tokenizer.encode(sample["predicted"])[0]:
                 correct_result += 1
-            surprise_result += compute_surprisal(logits, target_tokenizer.encode(sample["predicted"][0]))
+            surprise_result += compute_surprisal(logits, target_tokenizer.encode(sample["predicted"])[0])
             
             # Eval first token
             if args.eval_first_token:
-                first_token_id, first_token_hidden = hidden_representations[sample['idx']][1][0], hidden_representations[sample['idx']][1][1][layer_id][:, -1, :].to(device, non_blocking=True)
-                patched_prediction, logits = patch_target_model(target_model, target_tokenizer, sample["target_prompt"], target_layer_id, first_token_hidden, device)
+                first_token_id, first_token_hidden = hidden_representations[sample['idx']][1][0], hidden_representations[sample['idx']][1][1][layer_id][:, -1, :].to(target_model.device, non_blocking=True)
+                patched_prediction, logits = patch_target_model(target_model, target_tokenizer, sample["target_prompt"], target_layer_id, first_token_hidden)
                 if patched_prediction == first_token_id:
                     correct_first += 1
                 surprise_first += compute_surprisal(logits, first_token_id) 
@@ -145,8 +145,8 @@ def patchscope_eval(samples, source_model, source_tokenizer, target_model, targe
             # Eval important tokens
             token_representations = hidden_representations[sample['idx']][2]
             for token_id, token, representation in token_representations:
-                representation = representation[layer_id][:, -1, :].to(device, non_blocking=True)
-                patched_prediction, logits = patch_target_model(target_model, target_tokenizer, sample["target_prompt"], target_layer_id, representation, device)
+                representation = representation[layer_id][:, -1, :].to(target_model.device, non_blocking=True)
+                patched_prediction, logits = patch_target_model(target_model, target_tokenizer, sample["target_prompt"], target_layer_id, representation)
                 if token in operators:
                     num_operators += 1
                     if patched_prediction == token_id:

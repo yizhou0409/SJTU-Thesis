@@ -71,8 +71,7 @@ def load_model_and_tokenizer(
                                                     trust_remote_code=True,
                                                     use_safetensors=use_safetensors,
                                                     cache_dir=cache_dir)
-    if torch.cuda.is_available():
-        model = model.cuda()
+
     if load_in_half:
         model = model.half()
     model.eval()
