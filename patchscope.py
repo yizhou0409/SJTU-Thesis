@@ -130,7 +130,7 @@ def patchscope_eval(samples, source_model, source_tokenizer, target_model, targe
             # Eval result
             pre_result_hidden = hidden_representations[sample['idx']][0][layer_id][:, -1, :].to(target_model.device, non_blocking=True)
             patched_prediction, logits = patch_target_model(target_model, target_tokenizer, sample["target_prompt"], target_layer_id, pre_result_hidden)
-            if list(patched_prediction) == target_tokenizer.encode(sample["predicted"])[0]:
+            if list(patched_prediction) == [target_tokenizer.encode(sample["predicted"])[0]]:
                 correct_result += 1
             surprise_result += compute_surprisal(logits, target_tokenizer.encode(sample["predicted"])[0])
             

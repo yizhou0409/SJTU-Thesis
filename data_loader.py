@@ -48,8 +48,13 @@ def prepare_data(data_name, args):
     examples = load_data(data_name, args.split, args.data_dir)
 
     # sample `num_test_sample` from dataset
-    if args.num_test_sample > 0:
-        examples = examples[: args.num_test_sample]
+    if args.num_test_start > 0:
+        if args.num_test_end > 0:
+            examples = examples[args.num_test_start: args.num_test_end]
+        else:
+            examples = examples[args.num_test_start:]
+    elif args.num_test_end > 0:
+        examples = examples[:args.num_test_end]
 
     # shuffle
     if args.shuffle:
@@ -67,6 +72,6 @@ def prepare_data(data_name, args):
         output_dir = f"outputs/{output_dir}"
     
     target = "Wrong" if args.eval_wrong_answer else "Right"
-    out_file = f"{output_dir}/{data_name}/{out_file_prefix}_{extract_model_name(args.source_model_name)}_{target}_{args.num_test_sample}.jsonl"
+    out_file = f"{output_dir}/{data_name}/{out_file_prefix}_{extract_model_name(args.source_model_name)}_{target}_{args.num_test_start}_{args.num_test_end}.jsonl"
     os.makedirs(f"{output_dir}/{data_name}", exist_ok=True)
     return examples, out_file

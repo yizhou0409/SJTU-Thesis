@@ -33,7 +33,8 @@ def parse_args():
     parser.add_argument("--output_dir", default="./output", type=str)
     parser.add_argument("--prompt_type", default="qwen25-math-cot", type=str) #qwen25-math-cot, direct
     parser.add_argument("--num_shots", default=0, type=int)
-    parser.add_argument("--num_test_sample", default=-1, type=int)  # -1 for full data
+    parser.add_argument("--num_test_start", default=-1, type=int)  # -1 for full data
+    parser.add_argument("--num_test_end", default=-1, type=int)
     parser.add_argument("--split", default="test", type=str)
     parser.add_argument("--start", default=0, type=int)
     parser.add_argument("--end", default=-1, type=int)
@@ -174,6 +175,14 @@ def eval(source_model, target_model, source_tokenizer, target_tokenizer, data_na
     # Save surprisal and accuracy Json
     accuracy_json_dir = out_file.replace(".jsonl", f"_accuracy.json")
     surprisal_json_dir = out_file.replace(".jsonl", f"_surprisal.json")
+
+    surprisal_dict["num_samples"] = num_samples
+    surprisal_dict["num_operators"] = num_operators
+    surprisal_dict["num_numbers"] = num_numbers
+
+    accuracy_dict["num_samples"] = num_samples
+    accuracy_dict["num_operators"] = num_operators
+    accuracy_dict["num_numbers"] = num_numbers
 
     with open(accuracy_json_dir, "w") as file:
         json.dump(accuracy_dict, file, indent=4)
