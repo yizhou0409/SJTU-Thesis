@@ -13,7 +13,6 @@ def get_hidden_representation(source_model, source_tokenizer, source_prompt, tok
 
     token_representations = []
     first_token_hidden = None
-    first_token_id = None
     flag = True
 
     with torch.no_grad():
@@ -26,7 +25,7 @@ def get_hidden_representation(source_model, source_tokenizer, source_prompt, tok
 
             # Patch Result
             if "\\boxed{" in predicted_text and flag:
-                result_hidden = [layer.half().cpu() for layer in outputs.hidden_states]
+                result_hidden = (predicted_token_id, [layer.half().cpu() for layer in outputs.hidden_states])
                 flag = False
 
             # Patch First
@@ -35,11 +34,8 @@ def get_hidden_representation(source_model, source_tokenizer, source_prompt, tok
 
             # Patch Important Tokens
             if predicted_token in tokens:
-                if predicted_token == '*':
-                    if predicted_text[-1].isdigit() or predicted_text[-2].isdigit():
-                        token_representations.append((predicted_token_id, predicted_token, [layer.half().cpu() for layer in outputs.hidden_states]))
-                else:
-                    token_representations.append((predicted_token_id, predicted_token, [layer.half().cpu() for layer in outputs.hidden_states]))
+                token_representations.append((predicted_token_id, predicted_token, [layer.half().cpu() for layer in outputs.hidden_states]))
+
             predicted_text += predicted_token
             if re.search(r"\\boxed{.*?}", predicted_text):
                 break
@@ -76,7 +72,7 @@ def patch_target_model(target_model, target_tokenizer, target_prompt, target_lay
 def patchscope_eval(samples, source_model, source_tokenizer, target_model, target_tokenizer, args):
 
     # Build Important Token List
-    operators = ["+","-","*","/"]
+    operators = ["+","-"," *","/"]
     numbers = [str(i) for i in range(10)]
     tokens = []
 
@@ -100,6 +96,7 @@ def patchscope_eval(samples, source_model, source_tokenizer, target_model, targe
             predicted_text, result_hidden, first_token_hidden, token_representations = get_hidden_representation(
                 source_model, source_tokenizer, source_prompt, tokens, args)
             sample["predicted"] = get_result_from_box(predicted_text)
+            sample["full_text"] = predicted_text
             if args.eval_wrong_answer:
                 if get_result_from_box(predicted_text) and not math_equal(get_result_from_box(predicted_text), ground_truth):
                     hidden_representations[idx] = (result_hidden, first_token_hidden, token_representations)
@@ -108,7 +105,15 @@ def patchscope_eval(samples, source_model, source_tokenizer, target_model, targe
                 if math_equal(get_result_from_box(predicted_text), ground_truth):
                     hidden_representations[idx] = (result_hidden, first_token_hidden, token_representations)
                     remain_samples.append(sample)
-    
+                           
+            result = {
+                "idx": sample["idx"],
+                "question": sample["question"],
+                "gt": sample["gt"],
+                "predicted": sample["predicted"],
+                "full_text": sample["full_text"],
+            }
+            results.append(result)
     print("Now working on each layer:")
     _, n_layers = get_layers_to_enumerate(source_model)
     target_layer_id = args.target_layer_id
@@ -128,11 +133,11 @@ def patchscope_eval(samples, source_model, source_tokenizer, target_model, targe
             patched_prediction, logits = None, None
 
             # Eval result
-            pre_result_hidden = hidden_representations[sample['idx']][0][layer_id][:, -1, :].to(target_model.device, non_blocking=True)
+            result_token_id, pre_result_hidden = hidden_representations[sample['idx']][0][0], hidden_representations[sample['idx']][0][1][layer_id][:, -1, :].to(target_model.device, non_blocking=True)
             patched_prediction, logits = patch_target_model(target_model, target_tokenizer, sample["target_prompt"], target_layer_id, pre_result_hidden)
-            if list(patched_prediction) == [target_tokenizer.encode(sample["predicted"])[0]]:
+            if patched_prediction == result_token_id:
                 correct_result += 1
-            surprise_result += compute_surprisal(logits, target_tokenizer.encode(sample["predicted"])[0])
+            surprise_result += compute_surprisal(logits, result_token_id)
             
             # Eval first token
             if args.eval_first_token:
@@ -157,16 +162,6 @@ def patchscope_eval(samples, source_model, source_tokenizer, target_model, targe
                     if patched_prediction == token_id:
                         correct_numbers += 1
                     surprise_numbers += compute_surprisal(logits, token_id)
-               
-            if layer_id == n_layers - 1:
-                result = {
-                    "idx": sample["idx"],
-                    "question": sample["question"],
-                    "gt": sample["gt"],
-                    "target_prompt": sample["target_prompt"],
-                    "predicted": sample["predicted"],
-                }
-                results.append(result)
 
         corrects_result.append(correct_result)
         surprisal_result.append(surprise_result)

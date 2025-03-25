@@ -39,7 +39,7 @@ def parse_args():
     parser.add_argument("--start", default=0, type=int)
     parser.add_argument("--end", default=-1, type=int)
     parser.add_argument("--seed", default=42, type=int)
-    parser.add_argument("--max_token_gen", default=512, type=int)
+    parser.add_argument("--max_token_gen", default=1024, type=int)
     parser.add_argument("--shuffle", action='store_true')
 
     args = parser.parse_args()
@@ -135,6 +135,9 @@ def eval(source_model, target_model, source_tokenizer, target_tokenizer, data_na
         surprisal_operators = [a + b for a, b in zip(surprisal_operators, surprisal_operators_batch)]
         surprisal_numbers = [a + b for a, b in zip(surprisal_numbers, surprisal_numbers_batch)]
 
+    with open(out_file, "w") as file:
+        json.dump(results, file, indent=4)
+
     # Calculate Result
     accuracy_result = [correct / num_samples for correct in correct_result]
     surprisal_result = [surprise / num_samples for surprise in surprisal_result]
@@ -169,8 +172,6 @@ def eval(source_model, target_model, source_tokenizer, target_tokenizer, data_na
     plot_surprisal_curves(surprisal_dict, surprisal_file_dir)
     
     # Save result Json                              
-    with open(out_file, "w") as file:
-        json.dump(results, file, indent=4)
 
     # Save surprisal and accuracy Json
     accuracy_json_dir = out_file.replace(".jsonl", f"_accuracy.json")

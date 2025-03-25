@@ -288,6 +288,8 @@ PROMPT_TEMPLATES = {
 def construct_prompt(example, data_name, args):
 
     prompt_type = args.prompt_type
+    if data_name in ["asdiv"]:
+        data_name = 'gsm8k'
     demos = get_examples(prompt_type)[data_name][: args.num_shots]
     prompt_temp = PROMPT_TEMPLATES[prompt_type]
 
