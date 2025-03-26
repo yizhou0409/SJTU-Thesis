@@ -414,8 +414,6 @@ def parse_ground_truth(example: Dict[str, Any], data_name):
         gt_ans =  example["answer"]
     else:
         raise NotImplementedError(f"`{data_name}`")
-    # post process
-    gt_cot = str(gt_cot).strip()
     if data_name not in ["carp_en", "minerva_math"]:
         gt_ans = strip_string(gt_ans, skip_unit=data_name == "carp_en")
     else:

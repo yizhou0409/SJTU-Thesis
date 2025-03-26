@@ -1,5 +1,6 @@
 import json
 import time
+from utils import *
 
 def evaluate(outputs):
     """
@@ -30,3 +31,16 @@ def evaluate(outputs):
     }
     
     return result_json
+
+def evaluate_label(samples):
+    trues = []
+    falses = []
+    for i in range(len(samples)):
+        sample = samples[i]
+        pred = get_result_from_box(sample['pred'])
+        if math_equal(pred, sample['gt']):
+            trues.append(sample)
+        elif pred:
+            falses.append(sample)
+        samples[i]['pred_result'] = pred
+    return samples, trues, falses
