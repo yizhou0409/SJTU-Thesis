@@ -406,14 +406,15 @@ def parse_ground_truth(example: Dict[str, Any], data_name):
         gt_ans = extract_answer(gt_cot, data_name)
     elif data_name == "gsm8k":
         gt_cot, gt_ans = example["answer"].split("####")
-    elif data_name == "svamp":
+    elif data_name in ["svamp", 'sat_math']:
         gt_ans = example["Answer"]
     elif data_name == "asdiv":
         gt_ans = re.sub(r"\(.*?\)", "", example["answer"])
-    elif data_name == "carp_en":
-        gt_ans =  example["answer"]
+    elif data_name in ['aime24','amc23','tabmwp', 'carp_en']:
+        gt_ans = example['answer']
     else:
         raise NotImplementedError(f"`{data_name}`")
+        
     if data_name not in ["carp_en", "minerva_math"]:
         gt_ans = strip_string(gt_ans, skip_unit=data_name == "carp_en")
     else:

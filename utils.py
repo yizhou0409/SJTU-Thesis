@@ -27,6 +27,15 @@ def load_jsonl(file: Union[str, Path]) -> Iterable[Any]:
                 print("Error in loading:", line)
                 exit()
 
+def save_jsonl(samples, save_path):
+    # ensure path
+    folder = os.path.dirname(save_path)
+    os.makedirs(folder, exist_ok=True)
+
+    with open(save_path, "w", encoding="utf-8") as f:
+        for sample in samples:
+            f.write(json.dumps(sample, ensure_ascii=False) + "\n")
+    print("Saved to", save_path)
 
 def lower_keys(example):
     new_example = {}
@@ -288,7 +297,7 @@ PROMPT_TEMPLATES = {
 def construct_prompt(example, data_name, args):
 
     prompt_type = args.prompt_type
-    if data_name in ["asdiv"]:
+    if data_name not in ["math"]:
         data_name = 'gsm8k'
     demos = get_examples(prompt_type)[data_name][: args.num_shots]
     prompt_temp = PROMPT_TEMPLATES[prompt_type]

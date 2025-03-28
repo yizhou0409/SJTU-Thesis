@@ -51,7 +51,7 @@ def load_model_and_tokenizer(
 
     if not tokenizer_name:
         tokenizer_name = model_name
-    tokenizer = AutoTokenizer.from_pretrained(tokenizer_name,padding_side=padding_side, trust_remote_code=True, force_download=True)
+    tokenizer = AutoTokenizer.from_pretrained(tokenizer_name,padding_side=padding_side, trust_remote_code=True, force_download=True, cache_dir=cache_dir)
     #tokenizer = AutoTokenizer.from_pretrained(tokenizer_name)
     # set pad token to eos token if pad token is not set
     if tokenizer.pad_token is None:

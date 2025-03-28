@@ -1,34 +1,30 @@
 import random
 import os
 import argparse
-import time
+import gc
 from vllm import LLM, SamplingParams
-from datetime import datetime
 from tqdm import tqdm
 
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
 
-from evaluate import evaluate
-from utils import set_seed, load_jsonl, save_jsonl, construct_prompt
+from evaluate import *
+from utils import *
 from parser import *
-from trajectory import *
-from data_loader import load_data
-from python_executor import PythonExecutor
-from model_utils import load_hf_lm_and_tokenizer, generate_completions
+from data_loader import *
+from model import *
 
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--data_names", default="gsm8k,math", type=str)
+    parser.add_argument("--data_names", default="gsm8k,math,aime24,amc23,minerva_math", type=str)
     parser.add_argument("--data_dir", default="./data", type=str)
     parser.add_argument("--output_dir", default="./output", type=str)
-    parser.add_argument("--prompt_type", default="very_direct", type=str)
-    parser.add_argument("--split", default="train", type=str)
-    parser.add_argument("--seed", default=0, type=int)
-    parser.add_argument("--shuffle", action="store_true")
-    parser.add_argument("--use_vllm", action="store_true")
-    parser.add_argument("--overwrite", action="store_true")
+    parser.add_argument("--label_dir", default="./labels")
+    parser.add_argument("--prompt_type", default="qwen25-math-cot", type=str)
+    parser.add_argument("--seed", default=42, type=int)
+    parser.add_argument("--num_shots", default=0, type=int)
+    parser.add_argument("--max_token_gen", default=512, type=int)
     parser.add_argument("--use_safetensors", action="store_true")
     args = parser.parse_args()
     return args
@@ -38,26 +34,45 @@ def setup(args):
     # load model
     available_gpus = os.environ["CUDA_VISIBLE_DEVICES"].split(",")
 
-    llm = LLM(args.model_name, trust_remote_code=True, dtype='float16', download_dir='/scratch/yl9038/.cache')
+    llm = LLM('Qwen/Qwen2.5-Math-1.5B-Instruct', trust_remote_code=True, dtype='float16', download_dir='/scratch/yl9038/.cache')
     tokenizer = None
-
 
     # infer & eval
     data_list = args.data_names.split(",")
-    trues, falses = []
+    trues, falses = [], []
 
     for data_name in data_list:
         trues_data, falses_data = main(llm, tokenizer, data_name, args)
         trues.extend(trues_data), falses.extend(falses_data)
 
-    # print all results
-    pad = max([len(data_name) for data_name in data_list])
-    print("\t".join(data_name.ljust(pad, " ") for data_name in data_list))
-    print("\t".join([f"{result['acc']:.1f}".ljust(pad, " ") for result in results]))
+    del llm
+    gc.collect()
+    torch.cuda.empty_cache()
+
+    llm = LLM('Qwen/Qwen2.5-Math-7B-Instruct', trust_remote_code=True, dtype='float16', download_dir='/scratch/yl9038/.cache')
+    trues_hard, falses_hard = [], []
+
+    for data_name in data_list:
+        trues_data, falses_data = main(llm, tokenizer, data_name, args)
+        trues_hard.extend(trues_data), falses_hard.extend(falses_data)
+
+    easy, hard, very_hard = trues, [], []
+    for example in trues_hard:
+        if example not in easy:
+            hard.append(example)
+    
+    for example in falses_hard:
+        if example not in easy:
+            very_hard.append(example)
+
+    save_jsonl(easy, "{}/easy.jsonl".format(args.label_dir))
+    save_jsonl(hard, "{}/hard.jsonl".format(args.label_dir))
+    save_jsonl(very_hard, "{}/very_hard.jsonl".format(args.label_dir))
+
 
 
 def main(llm, tokenizer, data_name, args):
-    examples, out_file = prepare_data(data_name, args)
+    examples, out_file = prepare_data_for_labelling(data_name, args)
     print("=" * 50)
     print("data:", data_name, " ,remain samples:", len(examples))
     if len(examples) > 0:
@@ -72,25 +87,23 @@ def main(llm, tokenizer, data_name, args):
         if example["question"] == "":
             continue
         gt_ans = parse_ground_truth(example, data_name)
-        example["gt_ans"] = gt_ans
-        full_prompt = construct_prompt(example, data_name, args)
 
-        if idx == args.start:
-            print(full_prompt)
+        if is_digit(gt_ans):
+            example["gt_ans"] = gt_ans
+            full_prompt = construct_prompt(example, data_name, args)
 
-        sample = {
-            "idx": idx,
-            "question": example["question"],
-            "gt": gt_ans,
-            "prompt": full_prompt,
-        }
+            if idx == 0:
+                print(full_prompt)
 
-        samples.append(sample)
+            sample = {
+                "idx": idx,
+                "question": example["question"],
+                "gt": gt_ans,
+                "prompt": full_prompt,
+            }
 
-    # repeat n times
-    input_prompts = [
-        sample["prompt"] for sample in samples for _ in range(args.n_sampling)
-    ]
+            samples.append(sample)
+
     remain_prompts = [sample['prompt'] for sample in samples]
     remain_prompts = [(i, prompt) for i, prompt in enumerate(remain_prompts)]
 
@@ -101,22 +114,18 @@ def main(llm, tokenizer, data_name, args):
 
     # start inference
 
-    print("-" * 20, "Epoch", epoch)
+    print("-" * 20)
 
     # get all outputs
-    prompts = [item[1] for item in current_prompts]
+    prompts = [item[1] for item in remain_prompts]
     outputs = llm.generate(
         prompts,
         SamplingParams(
-            temperature=args.temperature,
-            top_p=args.top_p,
-            max_tokens=args.max_tokens_per_call,
+            max_tokens=args.max_token_gen,
             n=1,
             stop=stop_words,
             stop_token_ids=(
                 [151645, 151643]
-                if "qwen2" in args.model_name_or_path.lower()
-                else None
             ),
         ),
     )
@@ -126,12 +135,12 @@ def main(llm, tokenizer, data_name, args):
     )  # sort outputs by request_id
     outputs = [output.outputs[0].text for output in outputs]
 
-    assert len(outputs) == len(current_prompts)
+    assert len(outputs) == len(remain_prompts)
 
     # put results back to examples
     all_samples = []
     for i, sample in enumerate(samples):
-        result = outputs[i * args.n_sampling : (i + 1) * args.n_sampling]
+        result = outputs[i]
         sample.update({"pred":result})
         all_samples.append(sample)
 
