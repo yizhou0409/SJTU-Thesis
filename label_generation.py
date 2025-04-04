@@ -56,14 +56,14 @@ def setup(args):
         trues_data, falses_data = main(llm, tokenizer, data_name, args)
         trues_hard.extend(trues_data), falses_hard.extend(falses_data)
 
-    easy, hard, very_hard = trues, [], []
+    easy, hard, very_hard = [{"question":example["question"], "gt":example["gt"]} for example in trues], [], []
     for example in trues_hard:
-        if example not in easy:
-            hard.append(example)
+        if example['question'] not in easy:
+            hard.append({"question":example["question"], "gt":example["gt"]})
     
     for example in falses_hard:
-        if example not in easy:
-            very_hard.append(example)
+        if example['question'] not in easy:
+            very_hard.append({"question":example["question"], "gt":example["gt"]})
 
     save_jsonl(easy, "{}/easy.jsonl".format(args.label_dir))
     save_jsonl(hard, "{}/hard.jsonl".format(args.label_dir))

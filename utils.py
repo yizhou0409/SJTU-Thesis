@@ -33,8 +33,7 @@ def save_jsonl(samples, save_path):
     os.makedirs(folder, exist_ok=True)
 
     with open(save_path, "w", encoding="utf-8") as f:
-        for sample in samples:
-            f.write(json.dumps(sample, ensure_ascii=False) + "\n")
+        json.dump(samples, f, ensure_ascii=False, indent=4)
     print("Saved to", save_path)
 
 def lower_keys(example):

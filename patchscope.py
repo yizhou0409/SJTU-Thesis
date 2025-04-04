@@ -86,7 +86,7 @@ def patchscope_eval(samples, source_model, source_tokenizer, target_model, targe
     remain_samples = []
     print("Getting the hidden representation......")
     
-    batch_size = 32  # Tune based on GPU memory
+    batch_size = 16  # Tune based on GPU memory
     for i in tqdm(range(0, len(samples), batch_size), desc="Processing batches"):
         batch_samples = samples[i:i + batch_size]
         for sample in batch_samples:
