@@ -33,7 +33,7 @@ def parse_args():
     return args
 
 
-def setup_(args):
+def setup(args):
     
     data_list = args.data_names.split(",")
 

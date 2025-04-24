@@ -70,7 +70,7 @@ train_questions, val_questions, train_labels, val_labels = train_test_split(
 )
 
 # Initialize the tokenizer
-tokenizer = BertTokenizer.from_pretrained('bert-base-uncased',cache_dir = "$SCRATCH/.cache")
+tokenizer = BertTokenizer.from_pretrained('bert-base-uncased',cache_dir = "/scratch/yl9038/.cache")
 
 # Create datasets and data loaders
 max_length = 128
