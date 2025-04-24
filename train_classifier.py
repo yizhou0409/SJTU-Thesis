@@ -45,7 +45,7 @@ def load_data(file_paths):
         with open(file_path, 'r') as f:
             data = json.load(f)
             for item in data:
-                questions.append(item)
+                questions.append(item['question'])
                 labels.append(label)
     return questions, labels
 
@@ -90,7 +90,7 @@ optimizer = AdamW(model.parameters(), lr=5e-5)
 loss_fn = torch.nn.CrossEntropyLoss()
 
 # Training loop
-epochs = 20
+epochs = 50
 for epoch in range(epochs):
     model.train()
     total_loss = 0

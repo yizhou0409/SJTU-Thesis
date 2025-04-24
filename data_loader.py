@@ -94,3 +94,18 @@ def prepare_data_for_labelling(data_name, args):
     out_file = f"{output_dir}/{data_name}/{out_file_prefix}_labeling.jsonl"
     os.makedirs(f"{output_dir}/{data_name}", exist_ok=True)
     return examples, out_file
+
+def prepare_data_for_thesis(data_name, args): 
+    split = 'test'  
+    examples = load_data(data_name, split, args.data_dir)
+
+    # get out_file name
+    dt_string = datetime.now().strftime("%m-%d_%H-%M")
+    out_file_prefix = f"{args.prompt_type}_seed{args.seed}"
+    output_dir = args.output_dir
+    if not os.path.exists(output_dir):
+        output_dir = f"outputs/{output_dir}"
+
+    out_file = f"{output_dir}/{data_name}/{out_file_prefix}_thesis.jsonl"
+    os.makedirs(f"{output_dir}/{data_name}", exist_ok=True)
+    return examples, out_file
