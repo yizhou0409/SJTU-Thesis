@@ -19,7 +19,7 @@ from classifier import *
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--base_model", default="Qwen/Qwen2.5-Math-1.5B-Instruct", type=str)
-    parser.add_argument("--advanced_model", default="Qwen/Qwen2.5-Math-1.5B-Instruct", type=str)
+    parser.add_argument("--advanced_model", default="Qwen/Qwen2.5-Math-7B-Instruct", type=str)
     parser.add_argument("--data_names", default="gsm8k,math,", type=str)
     parser.add_argument("--data_dir", default="./data", type=str)
     parser.add_argument("--output_dir", default="./output", type=str)
@@ -85,10 +85,11 @@ def main(tokenizer, data_name, args):
 
 
     device0 = torch.device("cuda:0")
+    # device1 = torch.device("cuda:1")
     base_llm = AutoModelForCausalLM.from_pretrained(
         args.base_model, trust_remote_code=True, torch_dtype=torch.float16, cache_dir='/scratch/yl9038/.cache'
     ).to(device0)
-
+    
     print("Evaluating: base")
     result_json_base = eval_model(base_llm, tokenizer, samples, out_file.replace(".jsonl", "_base.json"), device0)
     result_json_base["type"] = "base"
@@ -96,22 +97,23 @@ def main(tokenizer, data_name, args):
     del base_llm
     gc.collect()
     torch.cuda.empty_cache()
-
-    advanced = AutoModelForCausalLM.from_pretrained(
-        args.base_model, trust_remote_code=True, torch_dtype=torch.float16, cache_dir='/scratch/yl9038/.cache'
-    ).to(device0)
-
+    
+    advanced_llm = AutoModelForCausalLM.from_pretrained(
+        args.advanced_model, trust_remote_code=True, torch_dtype=torch.float16, cache_dir='/scratch/yl9038/.cache'
+    ).to(device1)
+    
     print("Evaluating: advanced")
     result_json_advanced = eval_model(advanced_llm, tokenizer, samples, out_file.replace(".jsonl", "_advance.json"), device0)
     result_json_advanced["type"] = "advanced"
+    """
 
-
-    # print("Evaluating; With classifier")
-    # result_json_classifier = eval_classifier(base_llm, advanced_llm, tokenizer, samples, out_file.replace(".jsonl", "_classifier.json"), args)
-    # result_json_classifier["type"] = "With classifier"
-
+    print("Evaluating; With classifier")
+    result_json_classifier = eval_classifier(base_llm, advanced_llm, tokenizer, samples, out_file.replace(".jsonl", "_classifier.json"), args)
+    result_json_classifier["type"] = "With classifier"
+    """
     # save_jsonl([result_json_base, result_json_advanced, result_json_classifier], out_file)
     save_jsonl([result_json_base, result_json_advanced], out_file)
+    # save_jsonl([result_json_classifier], out_fule.replace(".jsonl","_result_classifier.json"))
 
 def eval_model(llm, tokenizer, samples, out_file, device):
     all_samples = []
