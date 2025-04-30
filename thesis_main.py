@@ -38,8 +38,7 @@ def setup(args):
     data_list = args.data_names.split(",")
     for data_name in data_list:
         data_name = data_name.strip()
-        main(tokenizer, data_name, args)
-
+        main(data_name, args)
 
 def generate_text(model, tokenizer, prompt, args, device):
     input_ids = tokenizer(prompt, return_tensors="pt").input_ids.to(device)
@@ -51,7 +50,7 @@ def generate_text(model, tokenizer, prompt, args, device):
     return tokenizer.decode(gen_output[0], skip_special_tokens=True)
 
 
-def main(tokenizer, data_name, args):
+def main(data_name, args):
 
     examples, out_file = prepare_data_for_thesis(data_name, args)
     print("=" * 50)
@@ -94,8 +93,8 @@ def main(tokenizer, data_name, args):
         use_fast=True,
         trust_remote_code=True,
         cache_dir='/scratch/yl9038/.cache'
-    ).to(device0)
-    
+    )
+
     print("Evaluating: base")
     result_json_base = eval_model(base_llm, base_tokenizer, samples, out_file.replace(".jsonl", "_base.json"), device0)
     result_json_base["type"] = "base"
@@ -113,7 +112,7 @@ def main(tokenizer, data_name, args):
         use_fast=True,
         trust_remote_code=True,
         cache_dir='/scratch/yl9038/.cache'
-    ).to(device1)
+    )
 
     print("Evaluating: advanced")
     result_json_advanced = eval_model(advanced_llm, advanced_tokenizer, samples, out_file.replace(".jsonl", "_advance.json"), device1)
@@ -139,8 +138,8 @@ def eval_model(llm, tokenizer, samples, out_file, device):
     for sample in tqdm(samples[:10], total=10):
         generated_text = generate_text(llm, tokenizer, sample['prompt'], args, device)
         pred = get_result_from_box(generated_text)
-        if pred:
-            print(1)
+        print(generated_text, 'PRED ', pred)
+        if pred != None:
             num_samples += 1
             sample['pred'] = pred
             all_samples.append(sample)
@@ -178,7 +177,7 @@ def eval_classifier(base_llm, advanced_llm, base_tokenizer, advanced_tokenizer, 
 
         generated_text = generate_text(llm, tokenizer, sample['prompt'], args, device)
         pred = get_result_from_box(generated_text)
-        if pred:
+        if pred != None:
             num_samples += 1
             sample['pred'] = pred
             all_samples.append(sample)

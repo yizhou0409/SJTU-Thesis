@@ -188,7 +188,7 @@ def eval(source_model, target_model, source_tokenizer, target_tokenizer, data_na
     with open(accuracy_json_dir, "w") as file:
         json.dump(accuracy_dict, file, indent=4)
     with open(surprisal_json_dir, "w") as file:
-        json.dump(accuracy_dict, file, indent=4)
+        json.dump(surprisal_dict, file, indent=4)
     return
 
 if __name__ == "__main__":

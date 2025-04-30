@@ -1,6 +1,6 @@
 import torch 
 from transformers import AutoModelForCausalLM, AutoTokenizer
-import ret
+import re
 from typing import Optional
 
 def last_digit_token_id(sentence: str, tokenizer) -> Optional[int]:
