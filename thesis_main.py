@@ -47,7 +47,8 @@ def generate_text(model, tokenizer, prompt, args, device):
         max_new_tokens=args.max_token_gen,
         eos_token_id=tokenizer.eos_token_id
     )
-    return tokenizer.decode(gen_output[0], skip_special_tokens=True)
+    generated_ids = gen_output[0][input_ids.shape[-1]:]
+    return tokenizer.decode(generated_ids, skip_special_tokens=True)
 
 
 def main(data_name, args):
@@ -134,11 +135,9 @@ def eval_model(llm, tokenizer, samples, out_file, device):
     correct = 0
     start_time = time.time()
 
-    # for sample in tqdm(samples, total=len(samples)):
-    for sample in tqdm(samples[:10], total=10):
+    for sample in tqdm(samples, total=len(samples)):
         generated_text = generate_text(llm, tokenizer, sample['prompt'], args, device)
         pred = get_result_from_box(generated_text)
-        print(generated_text, 'PRED ', pred)
         if pred != None:
             num_samples += 1
             sample['pred'] = pred
