@@ -7,38 +7,42 @@ def read_result_from_json(json_file):
         data = json.load(file)
     return data['Result']  # Assuming 'Result' is the key in the JSON file
 
-# Function to plot the accuracy curve
-def plot_accuracy_curve(result_data, save_path, dataset, model):
+# Function to plot the accuracy and surprisal curves
+def plot_curves(accuracy_data, surprisal_data, save_path=None):
     # Create a figure and axis for the plot
     fig, ax = plt.subplots(figsize=(10, 7))
 
-    # Plot the accuracy curve with a refined line style, color, and markers
-    ax.plot(range(1, len(result_data) + 1), result_data, marker='o', color='#1f77b4', linestyle='-', 
+    x = range(1, len(accuracy_data) + 1)
+
+    # Plot the accuracy curve
+    ax.plot(x, accuracy_data, marker='o', color='#1f77b4', linestyle='-', 
             linewidth=2.5, markersize=8, markerfacecolor='white', label="Accuracy Curve", zorder=5)
 
-    # Add title and labels with a clean, modern font style
-    # ax.set_title(f"{model} on {dataset}", fontsize=20, fontweight='bold')
-    ax.set_xlabel("Layer ID", fontsize=18)
-    ax.set_ylabel("Accuracy", fontsize=18)
+    # Plot the surprisal curve
+    ax.plot(x, surprisal_data, marker='s', color='#ff7f0e', linestyle='--',
+            linewidth=2.5, markersize=7, markerfacecolor='white', label="Surprisal Curve", zorder=4)
 
-    # Set grid with subtle gray lines
+    # Labels
+    ax.set_xlabel("Layer ID", fontsize=16, fontweight='bold', family='DejaVu Sans')
+    ax.set_ylabel("Value", fontsize=16, fontweight='bold', family='DejaVu Sans')
+
+    # Grid and ticks
     ax.grid(True, linestyle='--', alpha=0.7, color='gray', linewidth=0.7)
+    plt.xticks(fontsize=14, fontweight='light', family='DejaVu Sans')
+    plt.yticks(fontsize=14, fontweight='light', family='DejaVu Sans')
 
-    # Customize ticks with a refined font size
-    plt.xticks(fontsize=14, fontweight='light')
-    plt.yticks(fontsize=14, fontweight='light')
+    # Legend
+    ax.legend(loc='lower right', fontsize=14, frameon=True, facecolor='white',
+              edgecolor='gray', framealpha=0.9, borderpad=1, labelspacing=1.5,
+              title="Legend", title_fontsize=16)
 
-    # Create a customized legend
-    ax.legend(loc='lower right', fontsize=14, frameon=True, facecolor='white', edgecolor='#1f77b4', 
-              framealpha=0.8, borderpad=1, labelspacing=1.5)
-
-    # Save the plot if save_path is provided
+    # Save and show
     if save_path:
-        plt.savefig(save_path, dpi=300, bbox_inches='tight')  # High-quality output with tight layout
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
 
-    # Show the plot
     plt.tight_layout()
     plt.show()
+
 
 # Main function to run the program
 if __name__ == "__main__":
@@ -46,10 +50,13 @@ if __name__ == "__main__":
     dataset = "GSM8K"
     model = "Qwen2.5-Math-1.5B-Instruct"
     eval_type = "Right"
-    json_file = f"outputs/output/{dataset.lower()}/qwen25-math-cot_seed42_{model}_{eval_type}_-1_-1_accuracy.json"
+    accuracy_json_file = f"outputs/output/{dataset.lower()}/qwen25-math-cot_seed42_{model}_{eval_type}_-1_-1_accuracy.json"
+    surprisal_json_file = f"outputs/output/{dataset.lower()}/qwen25-math-cot_seed42_{model}_{eval_type}_-1_-1_surprisal.json"
     save_path = 'plots/gsm8k_1.5B_Instruct.png'
-    # Read the result data from the JSON file
-    result_data = read_result_from_json(json_file)
+
+    # Read data
+    accuracy_data = read_result_from_json(accuracy_json)
+    surprisal_data = read_result_from_json(surprisal_json)
 
     # Plot the accuracy curve
-    plot_accuracy_curve(result_data, save_path, dataset, model)
+    plot_accuracy_curve(result_data, save_path, save_path)
