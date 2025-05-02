@@ -25,7 +25,7 @@ def parse_args():
     parser.add_argument("--target_model_name", default="same", type=str) # same or specify a model name
     parser.add_argument("--eval_target_layer", default="same", type=str) #use_arg, same
     parser.add_argument("--eval_wrong_answer", action="store_true") # eval right answer or wrong answer
-    parser.add_argument("--eval_first_token", action="store_true")
+    parser.add_argument("--eval_first_token", action="store_false")
     parser.add_argument("--eval_numbers", action="store_false")
     parser.add_argument("--eval_operators", action="store_false")
     parser.add_argument("--eval_batchsize", default=64, type=int) # Use batchsize to prevent OOM
