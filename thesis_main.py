@@ -160,6 +160,7 @@ def eval_classifier(base_llm, advanced_llm, base_tokenizer, advanced_tokenizer, 
     all_samples = []
     num_samples = 0
     correct = 0
+    pred = 0
     start_time = time.time()
 
     for sample in tqdm(samples, total=len(samples)):
@@ -169,13 +170,15 @@ def eval_classifier(base_llm, advanced_llm, base_tokenizer, advanced_tokenizer, 
         elif label == 'hard':
             llm, tokenizer, device = advanced_llm, advanced_tokenizer, torch.device("cuda:1")
         elif label == 'very_hard':
-            sample['pred'] = "\\boxed{{0}}"
+            pred = 0
             continue
         else:
-            raise ValueError("Not Correct Label")
+            continue
+            
+        if label in [easy, hard]:
+            generated_text = generate_text(llm, tokenizer, sample['prompt'], args, device)
+            pred = get_result_from_box(generated_text)
 
-        generated_text = generate_text(llm, tokenizer, sample['prompt'], args, device)
-        pred = get_result_from_box(generated_text)
         if pred != None:
             num_samples += 1
             sample['pred'] = pred

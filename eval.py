@@ -25,7 +25,7 @@ def parse_args():
     parser.add_argument("--target_model_name", default="same", type=str) # same or specify a model name
     parser.add_argument("--eval_target_layer", default="same", type=str) #use_arg, same
     parser.add_argument("--eval_wrong_answer", action="store_true") # eval right answer or wrong answer
-    parser.add_argument("--eval_first_token", action="store_false")
+    parser.add_argument("--eval_first_token", action="store_true")
     parser.add_argument("--eval_numbers", action="store_false")
     parser.add_argument("--eval_operators", action="store_false")
     parser.add_argument("--eval_batchsize", default=64, type=int) # Use batchsize to prevent OOM
@@ -39,7 +39,7 @@ def parse_args():
     parser.add_argument("--start", default=0, type=int)
     parser.add_argument("--end", default=-1, type=int)
     parser.add_argument("--seed", default=42, type=int)
-    parser.add_argument("--max_token_gen", default=1024, type=int)
+    parser.add_argument("--max_token_gen", default=512, type=int)
     parser.add_argument("--shuffle", action='store_true')
 
     args = parser.parse_args()
