@@ -175,7 +175,7 @@ def eval_classifier(base_llm, advanced_llm, base_tokenizer, advanced_tokenizer, 
         else:
             continue
             
-        if label in [easy, hard]:
+        if label in ['easy', 'hard']:
             generated_text = generate_text(llm, tokenizer, sample['prompt'], args, device)
             pred = get_result_from_box(generated_text)
 
