@@ -1,3 +1,7 @@
+"""
+classifier.py for SJTU Thesis
+"""
+
 import json
 import torch
 from transformers import BertTokenizer, BertForSequenceClassification
