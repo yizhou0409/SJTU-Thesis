@@ -1,3 +1,7 @@
+"""
+evaluate.py for SJTU Thesis
+"""
+
 import json
 import time
 from utils import *

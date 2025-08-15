@@ -1,3 +1,8 @@
+"""
+train_classifier.py for SJTU Thesis
+"""
+
+
 import json
 import torch
 import os

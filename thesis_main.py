@@ -1,3 +1,8 @@
+"""
+thesis_main.py for SJTU Thesis
+"""
+
+
 import random
 import os
 import argparse

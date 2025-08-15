@@ -1,3 +1,8 @@
+"""
+patchscope.py for SJTU Thesis
+"""
+
+
 import torch
 from model import *
 from utils import *

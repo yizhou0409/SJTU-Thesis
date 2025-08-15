@@ -1,3 +1,8 @@
+"""
+model.py for SJTU Thesis
+"""
+
+
 import torch 
 from transformers import AutoModelForCausalLM, AutoTokenizer
 import re

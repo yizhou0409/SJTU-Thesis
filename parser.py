@@ -1,3 +1,8 @@
+"""
+parser.py for SJTU Thesis
+"""
+
+
 import random
 import regex
 import re

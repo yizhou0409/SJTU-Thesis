@@ -1,3 +1,8 @@
+"""
+label_generation.py for SJTU Thesis
+"""
+
+
 import random
 import os
 import argparse

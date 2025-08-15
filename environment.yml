@@ -1,4 +1,4 @@
-name: Qwen_Math
+name: thesis
 channels:
   - defaults
   - https://repo.anaconda.com/pkgs/main
